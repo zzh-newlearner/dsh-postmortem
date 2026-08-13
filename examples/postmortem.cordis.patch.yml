@@ -1,0 +1,9 @@
+- id: postmortem
+  name: '@zzh-newlearner/dsh-postmortem'
+  config:
+    autoOnFailure: true
+    model:
+      enabled: false
+      provider: deepseek-official
+      model: deepseek-v4-flash
+      timeoutMs: 10000
