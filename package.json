@@ -1,5 +1,5 @@
 {
-  "name": "@zzh-newlearner/dsh-postmortem",
+  "name": "@huichangzz/dsh-postmortem",
   "version": "0.1.0",
   "description": "Local-first failure postmortems for DeepSeek Harness sessions.",
   "license": "MIT",

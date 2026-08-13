@@ -11,14 +11,14 @@ optional model review explains only a small, redacted evidence packet after a ru
 In a DSH profile directory, install the package:
 
 ```sh
-npm install @zzh-newlearner/dsh-postmortem
+npm install @huichangzz/dsh-postmortem
 ```
 
 Add the following entry to the profile's `cordis.patch.yml`:
 
 ```yaml
 - id: postmortem
-  name: '@zzh-newlearner/dsh-postmortem'
+  name: '@huichangzz/dsh-postmortem'
   config:
     autoOnFailure: true
     model:

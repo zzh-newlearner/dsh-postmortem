@@ -1,5 +1,5 @@
 - id: postmortem
-  name: '@zzh-newlearner/dsh-postmortem'
+  name: '@huichangzz/dsh-postmortem'
   config:
     autoOnFailure: true
     model:
