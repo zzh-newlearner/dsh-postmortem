@@ -1,34 +1,30 @@
-import type { Finding, PostmortemReport, ToolCall, TurnTrace } from './types.js'
+import type { Finding, ModelState, PostmortemReport, ToolCall, TurnTrace } from './types.js'
 
 const RETRY_THRESHOLD = 3
-
-function stepForCall(trace: TurnTrace, target: ToolCall): number {
-  return trace.toolCalls.indexOf(target) + 1
-}
 
 function toolSummary(call: ToolCall): string {
   return `tool=${call.name}, call=${call.callId}`
 }
 
-export function diagnose(trace: TurnTrace): PostmortemReport {
+function eventSeqs(...values: Array<number | undefined>): number[] {
+  return values.filter((value): value is number => value !== undefined)
+}
+
+export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'): PostmortemReport {
   const findings: Finding[] = []
   for (const call of trace.toolCalls) {
     if (call.isError) {
       findings.push({
-        code: 'tool_error',
-        severity: 'error',
-        step: stepForCall(trace, call),
-        title: `Tool ${call.name} failed`,
+        code: 'tool_error', severity: 'error', step: call.step,
+        title: `Tool ${call.name} failed`, eventSeqs: eventSeqs(call.callEventSeq, call.resultEventSeq),
         evidence: [toolSummary(call), ...(call.errorCode ? [`error_code=${call.errorCode}`] : [])],
         recommendation: 'Inspect the tool arguments and error code before retrying this action.',
       })
     }
-    if (call.result === undefined) {
+    if (trace.ended && !call.resultPresent) {
       findings.push({
-        code: 'missing_result',
-        severity: 'warning',
-        step: stepForCall(trace, call),
-        title: `Tool ${call.name} has no recorded result`,
+        code: 'missing_result', severity: 'warning', step: call.step,
+        title: `Tool ${call.name} has no recorded result`, eventSeqs: eventSeqs(call.callEventSeq),
         evidence: [toolSummary(call)],
         recommendation: 'Verify whether the tool timed out, was cancelled, or failed before it could return.',
       })
@@ -43,14 +39,13 @@ export function diagnose(trace: TurnTrace): PostmortemReport {
     runs.set(key, values)
   }
   for (const calls of runs.values()) {
-    if (calls.length >= RETRY_THRESHOLD && calls.every(call => call.isError || call.result === undefined)) {
+    if (calls.length >= RETRY_THRESHOLD && calls.every(call => call.isError || (trace.ended && !call.resultPresent))) {
       const first = calls[0]
       if (first === undefined) continue
       findings.push({
-        code: 'retry_loop',
-        severity: 'error',
-        step: stepForCall(trace, first),
+        code: 'retry_loop', severity: 'error', step: first.step,
         title: `Repeated failing call to ${first.name}`,
+        eventSeqs: calls.flatMap(call => eventSeqs(call.callEventSeq, call.resultEventSeq)),
         evidence: [`same_call_count=${calls.length}`, `tool=${first.name}`],
         recommendation: 'Stop repeating the unchanged call; inspect its preconditions or choose another recovery path.',
       })
@@ -59,22 +54,19 @@ export function diagnose(trace: TurnTrace): PostmortemReport {
 
   if (trace.endReason !== undefined && trace.endReason !== 'completed') {
     findings.push({
-      code: 'turn_failed',
-      severity: 'error',
-      step: Math.max(1, trace.toolCalls.length),
-      title: `Turn ended with ${trace.endReason}`,
+      code: 'turn_failed', severity: 'error', step: Math.max(1, ...trace.toolCalls.map(call => call.step)),
+      title: `Turn ended with ${trace.endReason}`, eventSeqs: eventSeqs(trace.endEventSeq),
       evidence: [`turn_end_reason=${trace.endReason}`],
       recommendation: 'Use the earlier tool findings as the first recovery target; do not treat the terminal state as a root cause.',
     })
   }
 
-  findings.sort((left, right) => right.severity.localeCompare(left.severity) || left.step - right.step)
+  findings.sort((left, right) => left.step - right.step || left.code.localeCompare(right.code))
   return {
-    schemaVersion: '1',
-    sessionId: trace.sessionId,
-    turn: trace.turn,
+    schemaVersion: '2', sessionId: trace.sessionId, turn: trace.turn, sourceSeq: trace.sourceSeq,
     decision: findings.length > 0 ? 'detected' : trace.ended ? 'clean' : 'inconclusive',
     findings,
+    modelState: findings.length > 0 ? modelState : 'skipped_clean',
   }
 }
 
@@ -82,9 +74,14 @@ export function formatReport(report: PostmortemReport): string {
   if (report.decision === 'clean') return `Postmortem: turn ${report.turn} has no recorded failures.`
   if (report.decision === 'inconclusive') return `Postmortem: turn ${report.turn} is still open or lacks enough recorded evidence.`
   const lines = [`Postmortem: ${report.findings.length} finding(s) in turn ${report.turn}.`]
-  for (const finding of report.findings.slice(0, 3)) {
+  for (const finding of report.findings.slice(0, 4)) {
     lines.push(`- [${finding.severity}] step ${finding.step}: ${finding.title}. ${finding.recommendation}`)
   }
-  if (report.modelExplanation !== undefined) lines.push(`Model review: ${report.modelExplanation}`)
+  if (report.modelReview !== undefined) {
+    lines.push(`Model review [${report.modelReview.confidence}]: ${report.modelReview.summary}`)
+    lines.push(`Immediate action: ${report.modelReview.immediateAction}`)
+  } else if (report.modelState === 'failed') {
+    lines.push('Model review was unavailable; deterministic findings remain authoritative.')
+  }
   return lines.join('\n')
 }

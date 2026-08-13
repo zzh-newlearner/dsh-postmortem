@@ -1,20 +1,16 @@
 # DSH Postmortem
 
-Local-first failure postmortems for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+Local-first, read-only failure postmortems for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-`dsh-postmortem` observes the session event log and explains failed turns without changing
-the agent, its tools, or its retry behavior. The default path is deterministic and local. An
-optional model review explains only a small, redacted evidence packet after a rule has fired.
+`dsh-postmortem` turns the existing DSH session event log into a short, redacted incident report. It does not alter the agent loop, retry a tool, inject a prompt, or upload a transcript. Optional model review is deliberately a second layer: deterministic findings are the authority, and invalid or unavailable model output is discarded.
 
 ## Install
-
-In a DSH profile directory, install the package:
 
 ```sh
 npm install @huichangzz/dsh-postmortem
 ```
 
-Add the following entry to the profile's `cordis.patch.yml`:
+Add this to the DSH profile's `cordis.patch.yml`:
 
 ```yaml
 - id: postmortem
@@ -23,42 +19,60 @@ Add the following entry to the profile's `cordis.patch.yml`:
     autoOnFailure: true
     model:
       enabled: false
-      provider: deepseek-official
-      model: deepseek-v4-flash
+      provider: your-provider
+      model: your-model
       timeoutMs: 10000
 ```
 
-Restart DSH, then enter `/postmortem` in a session to inspect its most recent turn. The
-command is read-only and never becomes model context.
+The plugin uses DSH's existing `llm` service. Configure model providers and keys in DSH, rather than this plugin; the package has no API-key setting and never writes a key.
 
-For a copyable config, see [examples/postmortem.cordis.patch.yml](examples/postmortem.cordis.patch.yml).
+## Commands
 
-## What It Detects
+| Command | Result |
+| --- | --- |
+| `/postmortem [turn]` | Readable report for the latest or selected turn. |
+| `/postmortem-export [turn]` | Redacted schema-v2 JSON report. |
+| `/postmortem-repair [turn]` | Copy-only repair prompt for a detected failure. |
 
-- Tool calls with a recorded error result.
-- Three or more unchanged tool calls that all fail or lack results.
-- Calls with no recorded result, which may indicate cancellation or timeout.
-- A turn that ended with a non-success reason.
+Commands use `recordInput: false`, so turn selection is not copied into `command/run` events. The repair command returns text only: it never calls a tool, submits a follow-up, retries an action, or makes itself model context.
 
-These are recorded observations, not claims of a unique root cause. A normal completed turn
-is reported as clean; an open turn is inconclusive.
+## Detection And Privacy Boundary
 
-## Optional Model Review
+The local rules detect tool error results, absent results after a closed turn, unchanged failed retries (three or more), and non-completed turn endings. An open turn stays inconclusive; it is not treated as a failed call simply because its result has not arrived yet.
 
-Set `model.enabled: true` to ask the configured DSH model for a concise explanation and one
-recovery action. The plugin sends only the top deterministic findings: finding code, step,
-tool/error identifiers, and recommendations. It does not send user messages, raw tool
-arguments, raw tool output, files, prompts, or credentials.
+Reports retain only turn number, tool name, opaque call ID, error code, step, and DSH event sequence numbers. They do not retain or export user messages, tool arguments, tool output, file contents, prompts, credentials, or a raw session trace. The in-memory cache contains those redacted reports only and disappears when DSH exits.
 
-The model has a 300-token response cap and the configured timeout. A timeout, transport error,
-or empty response leaves the deterministic report intact and marks model review as failed.
+When `model.enabled` is true, the plugin sends at most four already-redacted findings to the configured DSH model with a 240-token cap and configured timeout. The response must be exactly this JSON shape:
 
-## Privacy
+```json
+{
+  "summary": "...",
+  "immediateAction": "...",
+  "evidenceSteps": [1],
+  "confidence": "low"
+}
+```
 
-The plugin does not export telemetry, write a transcript, or make any network request unless
-optional model review is enabled. Reports contain tool names, opaque call IDs, error codes, and
-counts by default. DSH and its model provider own any request logging after model review is
-enabled.
+Every accepted `evidenceSteps` item must identify a recorded finding. Any transport error, timeout, non-JSON output, extra key, missing key, unknown step, or invalid field makes `modelState` `failed`; the deterministic report remains available. Model review is explanatory, not a controller for retry or tool execution.
+
+## Measuring Improvement
+
+This package proves diagnostic behavior locally. It cannot honestly prove end-task success-rate uplift on its own because the runner, task corpus, model, and stop rule live outside the plugin.
+
+Use `PairedRunRecord` and `evaluatePairs()` for an external runner's paired experiment. The published JSON Schema is [`schemas/paired-run-v1.schema.json`](schemas/paired-run-v1.schema.json). For every task, run exactly one matched `baseline` attempt and one `postmortem` attempt with the same task ID and `taskFingerprint`; `evaluatePairs()` excludes incomplete or mismatched pairs rather than silently comparing them.
+
+Release gates for a task-success claim:
+
+1. Pre-register the task source, task version/hash, model route, tool set, retry budget, timeout, and success oracle before running.
+2. Collect at least 100 eligible matched pairs. Keep the correction arm to the copy-only prompt workflow; do not enable automatic retries.
+3. Report baseline success rate, postmortem success rate, success-rate delta, paired wins/losses/ties, excluded-pair reasons, tool-call count, and elapsed time.
+4. Claim an improvement only when postmortem success rises by at least 5 percentage points, paired wins exceed paired losses, and no material regression in safety checks, tool-call count, or elapsed time is observed. Otherwise report the result as inconclusive or negative.
+
+Current repository acceptance checks are intentionally narrower and reproducible: 12 representative DSH event fixtures, three clean traces with no local finding, strict model-JSON validation or fallback, and one real `SessionStore + CommandRuntime + LlmRuntime` composition test. They establish correct plugin behavior, not an unmeasured task-success claim.
+
+## Evaluation Data Sources
+
+The package ships no external task corpus and makes no corpus download. Its 12 synthetic event fixtures are maintained in [`test/fixtures.ts`](test/fixtures.ts) and model DSH's public session event vocabulary. Any external paired evaluation must add its dataset source, version or commit hash, license/terms, acquisition date, task subset, and success oracle to its experiment report before results are compared.
 
 ## Development
 
@@ -70,8 +84,7 @@ npm run build
 npm pack --dry-run
 ```
 
-The package targets DSH `0.1.0-rc.6` and Cordis `4.0.1`. DSH is in developer preview; this
-plugin treats the public session event vocabulary as its compatibility boundary.
+The package targets DSH `0.1.0-rc.6` and Cordis `4.0.1`. DSH is in developer preview; the public session event vocabulary is this plugin's compatibility boundary.
 
 ## License
 

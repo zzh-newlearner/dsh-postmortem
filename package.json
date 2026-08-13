@@ -1,6 +1,6 @@
 {
   "name": "@huichangzz/dsh-postmortem",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Local-first failure postmortems for DeepSeek Harness sessions.",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,7 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": ["dist", "schemas", "README.md", "CHANGELOG.md", "LICENSE"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zzh-newlearner/dsh-postmortem.git"

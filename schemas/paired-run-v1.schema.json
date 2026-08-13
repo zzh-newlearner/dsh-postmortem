@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zzh-newlearner/dsh-postmortem/schemas/paired-run-v1.schema.json",
+  "title": "DSH Postmortem paired-run record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "pairId", "taskId", "arm", "success", "taskFingerprint", "toolCalls"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "pairId": { "type": "string", "minLength": 1 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "arm": { "enum": ["baseline", "postmortem"] },
+    "success": { "type": "boolean" },
+    "taskFingerprint": { "type": "string", "minLength": 1 },
+    "toolCalls": { "type": "integer", "minimum": 0 },
+    "elapsedMs": { "type": "number", "minimum": 0 }
+  }
+}
