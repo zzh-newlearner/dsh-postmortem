@@ -1,4 +1,5 @@
 import type { RecordedEvent, ToolCall, TurnTrace } from './types.js'
+import { argumentFingerprint } from './fingerprint.js'
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
@@ -19,6 +20,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
   const calls = new Map<string, ToolCall>()
   let endReason: string | undefined
   let endErrorCode: string | undefined
+  let endAbortCause: string | undefined
   let endEventSeq: number | undefined
   let sourceSeq = 0
   for (const event of events) {
@@ -33,7 +35,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
         calls.set(callId, {
           callId,
           name,
-          arguments: stringValue(event.data.arguments),
+          argumentFingerprint: argumentFingerprint(stringValue(event.data.arguments)),
           step,
           callEventSeq: event.seq,
           resultPresent: false,
@@ -65,6 +67,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
       const reason = objectValue(event.data.reason)
       endReason = stringValue(reason?.kind) ?? 'unknown'
       endErrorCode = stringValue(objectValue(reason?.error)?.code)
+      endAbortCause = stringValue(objectValue(reason?.reason)?.kind)
       endEventSeq = event.seq
     }
   }
@@ -74,6 +77,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
     ended: endReason !== undefined,
     endReason,
     endErrorCode,
+    endAbortCause,
     endEventSeq,
     sourceSeq,
     toolCalls: [...calls.values()].sort((left, right) => left.step - right.step || left.callId.localeCompare(right.callId)),

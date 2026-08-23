@@ -11,7 +11,7 @@ describe('DSH event fixtures', () => {
     expect(report.findings.flatMap(finding => finding.eventSeqs).every(Number.isSafeInteger)).toBe(true)
   })
 
-  it('contains twelve maintained representative event traces', () => {
-    expect(dshFixtures).toHaveLength(12)
+  it('contains thirteen maintained representative event traces', () => {
+    expect(dshFixtures).toHaveLength(13)
   })
 })

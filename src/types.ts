@@ -3,8 +3,8 @@ export type Severity = 'error' | 'warning'
 export interface ToolCall {
   callId: string
   name: string
-  /** Used only while diagnosing unchanged retries; never emitted in a report. */
-  arguments?: string
+  /** One-way key used only while diagnosing unchanged retries. */
+  argumentFingerprint?: string
   step: number
   callEventSeq?: number
   resultEventSeq?: number
@@ -19,12 +19,15 @@ export interface TurnTrace {
   ended: boolean
   endReason?: string
   endErrorCode?: string
+  endAbortCause?: string
   endEventSeq?: number
   sourceSeq: number
   toolCalls: ToolCall[]
 }
 
 export type FindingCode = 'tool_error' | 'retry_loop' | 'missing_result' | 'turn_failed'
+export type Actionability = 'actionable' | 'partly_actionable' | 'not_actionable' | 'insufficient_evidence'
+export type PostmortemDecision = 'detected' | 'clean' | 'cancelled' | 'inconclusive'
 
 export interface Finding {
   code: FindingCode
@@ -39,13 +42,15 @@ export interface Finding {
 }
 
 export interface ModelReview {
+  findingCode: FindingCode
   summary: string
   immediateAction: string
   evidenceSteps: number[]
   confidence: 'low' | 'medium' | 'high'
+  actionability: Actionability
 }
 
-export type ModelState = 'disabled' | 'skipped_clean' | 'completed' | 'failed'
+export type ModelState = 'disabled' | 'skipped_clean' | 'pending' | 'completed' | 'failed'
 
 export interface PostmortemReport {
   schemaVersion: '2'
@@ -53,7 +58,7 @@ export interface PostmortemReport {
   turn: number
   /** Last session event included while producing this report. */
   sourceSeq: number
-  decision: 'detected' | 'clean' | 'inconclusive'
+  decision: PostmortemDecision
   findings: Finding[]
   modelState: ModelState
   modelReview?: ModelReview

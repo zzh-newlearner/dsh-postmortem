@@ -1,8 +1,8 @@
 # Evaluation Seed Data / 评测种子数据
 
-`dsh-public-v0.1.1-rc.2` is a small, versioned regression corpus for the deterministic postmortem rules. It contains 16 redacted records: seven records derived from public DeepSeek Harness snapshot fixtures and nine records constructed from the public DSH session-event vocabulary. It is a seed corpus, not an independently human-adjudicated benchmark.
+`dsh-public-v0.1.1-rc.2` is a small, versioned regression corpus for the deterministic postmortem rules. It contains 24 redacted records: 15 records derived from public DeepSeek Harness snapshot or test fixtures and nine records constructed from the public DSH session-event vocabulary. It is a seed corpus, not an independently human-adjudicated benchmark.
 
-`dsh-public-v0.1.1-rc.2` 是用于确定性复盘规则的一个小型、版本化回归语料。它包含 16 条脱敏记录：其中 7 条从公开 DeepSeek Harness snapshot fixture 派生，9 条按公开 DSH session event 词汇表构造。它是种子语料，不是经过独立人工裁决的 benchmark。
+`dsh-public-v0.1.1-rc.2` 是用于确定性复盘规则的一个小型、版本化回归语料。它包含 24 条脱敏记录：其中 15 条从公开 DeepSeek Harness snapshot 或测试 fixture 派生，9 条按公开 DSH session event 词汇表构造。它是种子语料，不是经过独立人工裁决的 benchmark。
 
 ## Source And License / 来源与许可证
 
@@ -12,9 +12,9 @@ Public-source records come from [DeepSeek Harness](https://github.com/deepseek-a
 
 ## Redaction / 脱敏
 
-Only event type, event sequence, turn, step, opaque call ID, tool name, error flag, error code, and end reason remain. The corpus removes user and assistant text, tool arguments, tool output, filesystem paths, credential values, and other message content. Synthetic retry records use fixed, non-user placeholders only to exercise equality detection.
+Only event type, event sequence, turn, step, opaque call ID, tool name, error flag, error code, end reason, and abort cause remain. The corpus removes user and assistant text, tool arguments, tool output, filesystem paths, credential values, and other message content. Synthetic retry records use fixed, non-user placeholders only to exercise equality detection.
 
-语料只保留事件类型、事件序号、轮次、步骤、不透明 call ID、工具名、错误标记、错误码和结束原因。它删除用户与 assistant 文本、工具参数、工具输出、文件系统路径、凭据值及其他消息内容。合成的 retry 记录只使用固定、非用户占位符来覆盖相等性检测。
+语料只保留事件类型、事件序号、轮次、步骤、不透明 call ID、工具名、错误标记、错误码、结束原因和取消原因。它删除用户与 assistant 文本、工具参数、工具输出、文件系统路径、凭据值及其他消息内容。合成的 retry 记录只使用固定、非用户占位符来覆盖相等性检测。
 
 ## Labels And Use / 标签与使用方式
 
@@ -29,3 +29,7 @@ Run `npm test` to score the deterministic rules against every record. `scoreDiag
 For human review, create one annotation per reviewer using [`schemas/diagnosis-annotation-v1.schema.json`](../schemas/diagnosis-annotation-v1.schema.json). Use pseudonymous reviewer IDs and keep notes within the same redaction policy; a second reviewer and adjudication are required before interpreting agreement or quality metrics.
 
 人工复核时，每位审阅者应按照 [`schemas/diagnosis-annotation-v1.schema.json`](../schemas/diagnosis-annotation-v1.schema.json) 创建一条 annotation。使用匿名 reviewer ID，并让 notes 遵守相同的脱敏规则；在解释一致性或质量指标之前，必须有第二位审阅者和分歧裁决。
+
+The stable evaluation split is `sha256(record id)` modulo five: holdout when the first byte is zero, otherwise development. It is intended to prevent record movement while the corpus grows, not to make the seed labels into a benchmark.
+
+稳定评测划分使用 `sha256(record id)` 的首字节模五：为零时是 holdout，否则为 development。它用于确保语料增长时已有记录不移动，不会把 seed 标签变成 benchmark。

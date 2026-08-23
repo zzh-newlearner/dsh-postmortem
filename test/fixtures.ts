@@ -4,7 +4,7 @@ interface Fixture {
   name: string
   turn: number
   events: RecordedEvent[]
-  decision: 'detected' | 'clean' | 'inconclusive'
+  decision: 'detected' | 'clean' | 'cancelled' | 'inconclusive'
   codes: string[]
 }
 
@@ -27,6 +27,10 @@ function end(turn: number, kind: string, seq = 99): RecordedEvent {
   return { type: 'turn/end', seq, data: { turn, reason: { kind } } }
 }
 
+function userCancelled(turn: number): RecordedEvent {
+  return { type: 'turn/end', seq: 99, data: { turn, reason: { kind: 'aborted', reason: { kind: 'user' } } } }
+}
+
 export const dshFixtures: Fixture[] = [
   { name: 'completed-empty', turn: 1, events: [end(1, 'completed')], decision: 'clean', codes: [] },
   { name: 'open-turn', turn: 1, events: [call(1, 1, 'a')], decision: 'inconclusive', codes: [] },
@@ -35,6 +39,7 @@ export const dshFixtures: Fixture[] = [
   { name: 'retry-loop', turn: 1, events: [call(1, 1, 'a'), result(1, 1, 'a', true), call(1, 2, 'b'), result(1, 2, 'b', true), call(1, 3, 'c'), result(1, 3, 'c', true), end(1, 'error')], decision: 'detected', codes: ['retry_loop'] },
   { name: 'error-without-tool', turn: 1, events: [end(1, 'error')], decision: 'detected', codes: ['turn_failed'] },
   { name: 'aborted-turn', turn: 1, events: [end(1, 'aborted')], decision: 'detected', codes: ['turn_failed'] },
+  { name: 'user-cancelled-turn', turn: 1, events: [call(1, 1, 'a'), result(1, 1, 'a', true, 'ABORTED'), userCancelled(1)], decision: 'cancelled', codes: [] },
   { name: 'max-tokens-turn', turn: 1, events: [end(1, 'max-tokens')], decision: 'detected', codes: ['turn_failed'] },
   { name: 'successful-tool', turn: 1, events: [call(1, 1, 'a'), result(1, 1, 'a', false), end(1, 'completed')], decision: 'clean', codes: [] },
   { name: 'duplicate-successes', turn: 1, events: [call(1, 1, 'a'), result(1, 1, 'a', false), call(1, 2, 'b'), result(1, 2, 'b', false), call(1, 3, 'c'), result(1, 3, 'c', false), end(1, 'completed')], decision: 'clean', codes: [] },

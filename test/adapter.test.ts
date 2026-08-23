@@ -9,6 +9,8 @@ describe('turnFromEvents', () => {
       { type: 'turn/end', data: { turn: 2, reason: { kind: 'error' } } },
     ])
     expect(trace.toolCalls[0]).toMatchObject({ name: 'bash', isError: true, errorCode: 'ENOENT' })
+    expect(trace.toolCalls[0]?.argumentFingerprint).toMatch(/^sha256:/)
+    expect(JSON.stringify(trace)).not.toContain('"command":"bad"')
     expect(trace.endReason).toBe('error')
   })
 
@@ -24,5 +26,15 @@ describe('turnFromEvents', () => {
       { type: 'turn/end', seq: 8, data: { turn: 3, reason: { kind: 'error', error: { code: 'MISSING_CREDENTIAL', message: 'private detail' } } } },
     ])
     expect(trace.endErrorCode).toBe('MISSING_CREDENTIAL')
+  })
+
+  it('normalizes equivalent JSON arguments and retains user cancellation cause', () => {
+    const trace = turnFromEvents('session-1', 4, [
+      { type: 'tool/call', data: { turn: 4, step: 1, callId: 'first', name: 'shell', arguments: '{"a":1,"b":2}' } },
+      { type: 'tool/call', data: { turn: 4, step: 2, callId: 'second', name: 'shell', arguments: '{"b":2,"a":1}' } },
+      { type: 'turn/end', data: { turn: 4, reason: { kind: 'aborted', reason: { kind: 'user' } } } },
+    ])
+    expect(trace.toolCalls[0]?.argumentFingerprint).toBe(trace.toolCalls[1]?.argumentFingerprint)
+    expect(trace.endAbortCause).toBe('user')
   })
 })

@@ -1,6 +1,7 @@
 import { turnFromEvents } from './adapter.js'
 import { diagnose } from './diagnose.js'
-import type { FindingCode, RecordedEvent } from './types.js'
+import type { FindingCode, PostmortemDecision, RecordedEvent } from './types.js'
+import { createHash } from 'node:crypto'
 
 export type DatasetOriginKind = 'dsh_public_fixture' | 'dsh_schema_synthetic'
 
@@ -14,7 +15,7 @@ export interface DatasetOrigin {
 }
 
 export interface DatasetExpectation {
-  decision: 'detected' | 'clean' | 'inconclusive'
+  decision: PostmortemDecision
   findingCodes: FindingCode[]
   /** Event facts are curated but have not yet received independent human adjudication. */
   labelStatus: 'seed'
@@ -39,7 +40,15 @@ export interface DiagnosisCorpusScore {
   codeF1: number
 }
 
+export type EvaluationSplit = 'development' | 'holdout'
+
 const ALLOWED_EVENT_TYPES = new Set(['tool/call', 'tool/result', 'turn/end'])
+
+/** Stable record-id partition; adding new records never moves an existing record. */
+export function evaluationSplit(record: Pick<DiagnosisDatasetRecord, 'id'>): EvaluationSplit {
+  const digest = createHash('sha256').update(record.id).digest()[0]
+  return digest !== undefined && digest % 5 === 0 ? 'holdout' : 'development'
+}
 
 function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
   return Object.keys(value).every(key => allowed.includes(key))
@@ -85,8 +94,13 @@ function validateRedactedEvent(event: RecordedEvent, publicFixture: boolean): st
     if (!hasOnlyKeys(event.data, ['turn', 'reason'])) issues.push('turn end contains a non-redacted field')
     const reason = event.data.reason
     if (typeof reason !== 'object' || reason === null || Array.isArray(reason)
-      || !hasOnlyKeys(reason as Record<string, unknown>, ['kind', 'error'])) {
+      || !hasOnlyKeys(reason as Record<string, unknown>, ['kind', 'error', 'reason'])) {
       issues.push('turn end reason contains a non-redacted field')
+    }
+    const abortCause = (reason as Record<string, unknown> | undefined)?.reason
+    if (abortCause !== undefined && (typeof abortCause !== 'object' || abortCause === null || Array.isArray(abortCause)
+      || !hasOnlyKeys(abortCause as Record<string, unknown>, ['kind']))) {
+      issues.push('turn end abort cause contains a non-redacted field')
     }
     const error = (reason as Record<string, unknown> | undefined)?.error
     if (error !== undefined && (typeof error !== 'object' || error === null || Array.isArray(error)

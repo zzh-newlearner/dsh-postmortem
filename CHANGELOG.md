@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Adds cancellation-aware diagnosis, one-way normalized tool-argument fingerprints, bounded model timeouts, and trace-level model-review coalescing.
+- Adds 24 versioned, source-traceable redacted DSH seed records, including stable development/holdout partitioning.
+- Adds double-review annotation aggregation, adjudication support, and a bounded parallel OpenAI-compatible model evaluation runner.
+- Adds a generic `npm run eval:models` protocol smoke test that writes redacted, ignored artifacts only.
+
 ## 0.4.1
 
 - Fixes the DSH `0.1.1-rc.2` composition test for the current command attachment parameter.

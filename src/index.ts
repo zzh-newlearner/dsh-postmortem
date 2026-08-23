@@ -14,11 +14,15 @@ export { turnFromEvents } from './adapter.js'
 export { diagnose, formatReport } from './diagnose.js'
 export { explainWithModel, parseModelReview, reviewPrompt, type ModelConfig } from './explain.js'
 export { buildRepairPrompt } from './repair.js'
-export { scoreDiagnosisCorpus, validateDiagnosisDatasetRecord } from './dataset.js'
+export { summarizeAnnotations, validateDiagnosisAdjudication, validateDiagnosisAnnotation } from './annotations.js'
+export { evaluationSplit, scoreDiagnosisCorpus, validateDiagnosisDatasetRecord } from './dataset.js'
 export { evaluatePairs } from './evaluation.js'
+export { ModelEvaluationError, evaluateModelReviews, humanReferences, seedReferences, summarizeModelEvaluationRecords } from './model-eval.js'
 export { PostmortemStore } from './store.js'
 export type { PairedEvaluation, PairedRunRecord, PairIssue } from './evaluation.js'
-export type { DatasetExpectation, DatasetOrigin, DatasetOriginKind, DiagnosisCorpusScore, DiagnosisDatasetRecord } from './dataset.js'
+export type { DatasetExpectation, DatasetOrigin, DatasetOriginKind, DiagnosisCorpusScore, DiagnosisDatasetRecord, EvaluationSplit } from './dataset.js'
+export type { AnnotationIssue, AnnotationPrimaryIssue, AnnotationSummary, DiagnosisAdjudication, DiagnosisAnnotation, HumanReference } from './annotations.js'
+export type { ModelEvaluationCaller, ModelEvaluationCase, ModelEvaluationOptions, ModelEvaluationRecord, ModelEvaluationReference, ModelEvaluationRun, ModelEvaluationSummary } from './model-eval.js'
 export type * from './types.js'
 
 export const name = 'dsh-postmortem'
@@ -61,19 +65,23 @@ async function reportFor(
 ): Promise<PostmortemReport> {
   const trace = turnFromEvents(session.id, turn, recordedEvents(session))
   const cached = store.get(session.id, turn, trace.sourceSeq)
-  if (cached !== undefined) return cached
+  if (cached !== undefined) return store.getPending(session.id, turn, trace.sourceSeq) ?? cached
   const enabled = model?.enabled === true && llm !== undefined
-  let report = diagnose(trace, enabled ? 'failed' : 'disabled')
-  if (enabled && report.decision === 'detected' && model !== undefined) {
+  let report = diagnose(trace, enabled ? 'pending' : 'disabled')
+  const withRepairPrompt = (value: PostmortemReport): PostmortemReport => {
+    const repairPrompt = buildRepairPrompt(value)
+    return repairPrompt === undefined ? value : { ...value, repairPrompt }
+  }
+  report = store.set(withRepairPrompt(report))
+  if (!enabled || report.decision !== 'detected' || model === undefined) return report
+  return store.runPending(session.id, turn, trace.sourceSeq, async () => {
     try {
       const modelReview = await explainWithModel(llm, report, model, signal)
-      report = { ...report, modelState: 'completed', modelReview }
+      return store.set(withRepairPrompt({ ...report, modelState: 'completed', modelReview }))
     } catch {
-      report = { ...report, modelState: 'failed' }
+      return store.set(withRepairPrompt({ ...report, modelState: 'failed' }))
     }
-  }
-  const repairPrompt = buildRepairPrompt(report)
-  return store.set(repairPrompt === undefined ? report : { ...report, repairPrompt })
+  })
 }
 
 export function apply(ctx: Context, config: Config = {}): void {

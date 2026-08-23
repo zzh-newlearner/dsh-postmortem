@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { scoreDiagnosisCorpus, validateDiagnosisDatasetRecord, type DiagnosisDatasetRecord } from '../src/dataset.js'
+import { evaluationSplit, scoreDiagnosisCorpus, validateDiagnosisDatasetRecord, type DiagnosisDatasetRecord } from '../src/dataset.js'
 
 const datasetDir = join(dirname(fileURLToPath(import.meta.url)), '../datasets/dsh-public-v0.1.1-rc.2')
 
@@ -21,15 +21,17 @@ describe('public DSH seed corpus', () => {
     const records = await readCorpus()
     const manifest = await readManifest()
     const score = scoreDiagnosisCorpus(records)
-    expect(records).toHaveLength(16)
-    expect(manifest).toMatchObject({ recordCount: 16, sourceRevision: 'b150a551b8d465e31e418e1b2eaf5e79bbb7d28e' })
+    expect(records).toHaveLength(24)
+    expect(manifest).toMatchObject({ recordCount: 24, sourceRevision: 'b150a551b8d465e31e418e1b2eaf5e79bbb7d28e' })
     expect(new Set(records.map(record => record.id)).size).toBe(records.length)
-    expect(records.filter(record => record.origin.kind === 'dsh_public_fixture')).toHaveLength(7)
+    expect(records.filter(record => record.origin.kind === 'dsh_public_fixture')).toHaveLength(15)
     expect(records.every(record => record.origin.license === 'MIT' && record.expected.labelStatus === 'seed')).toBe(true)
+    expect(records.map(evaluationSplit)).toEqual(records.map(evaluationSplit))
+    expect(records.map(evaluationSplit)).toContain('holdout')
     expect(records.flatMap(validateDiagnosisDatasetRecord)).toEqual([])
     expect(JSON.stringify(records)).not.toMatch(/DEEPSEEK_API_KEY|sk-|ghp_|private output/i)
     expect(JSON.stringify(records.filter(record => record.origin.kind === 'dsh_public_fixture'))).not.toMatch(/"arguments"|"text"|"path":"[A-Z]:/i)
-    expect(score).toMatchObject({ records: 16, decisionMatches: 16, exactCodeMatches: 16, codePrecision: 1, codeRecall: 1, codeF1: 1 })
+    expect(score).toMatchObject({ records: 24, decisionMatches: 24, exactCodeMatches: 24, codePrecision: 1, codeRecall: 1, codeF1: 1 })
   })
 
   it('rejects retained content and missing public provenance', async () => {

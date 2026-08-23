@@ -1,5 +1,5 @@
 import { BlockAssembler, createUserMessage, deepFreeze, type LlmRuntime } from '@deepseek-ai/dsh-llm'
-import type { ModelReview, PostmortemReport } from './types.js'
+import type { Actionability, FindingCode, ModelReview, PostmortemReport } from './types.js'
 
 export interface ModelConfig {
   provider: string
@@ -8,13 +8,18 @@ export interface ModelConfig {
 }
 
 const MAX_FIELD_LENGTH = 600
+export const DEFAULT_MODEL_TIMEOUT_MS = 10_000
 
 function validText(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_FIELD_LENGTH
 }
 
 /** Validate model JSON before it becomes part of a report. Invalid output is discarded. */
-export function parseModelReview(text: string, allowedSteps: readonly number[]): ModelReview | undefined {
+export function parseModelReview(
+  text: string,
+  allowedSteps: readonly number[],
+  allowedFindingCodes: readonly FindingCode[],
+): ModelReview | undefined {
   let value: unknown
   try {
     value = JSON.parse(text)
@@ -23,15 +28,24 @@ export function parseModelReview(text: string, allowedSteps: readonly number[]):
   }
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const object = value as Record<string, unknown>
-  const expectedKeys = ['confidence', 'evidenceSteps', 'immediateAction', 'summary']
+  const expectedKeys = ['actionability', 'confidence', 'evidenceSteps', 'findingCode', 'immediateAction', 'summary']
   if (Object.keys(object).sort().join(',') !== expectedKeys.join(',')) return undefined
   if (!validText(object.summary) || !validText(object.immediateAction)) return undefined
   if (object.confidence !== 'low' && object.confidence !== 'medium' && object.confidence !== 'high') return undefined
+  if (!allowedFindingCodes.includes(object.findingCode as FindingCode)) return undefined
+  if (!['actionable', 'partly_actionable', 'not_actionable', 'insufficient_evidence'].includes(object.actionability as Actionability)) return undefined
   if (!Array.isArray(object.evidenceSteps)
     || object.evidenceSteps.some(step => !Number.isSafeInteger(step) || !allowedSteps.includes(step))) return undefined
   const evidenceSteps = [...new Set(object.evidenceSteps as number[])].sort((left, right) => left - right)
   if (evidenceSteps.length === 0) return undefined
-  return { summary: object.summary.trim(), immediateAction: object.immediateAction.trim(), evidenceSteps, confidence: object.confidence }
+  return {
+    findingCode: object.findingCode as FindingCode,
+    summary: object.summary.trim(),
+    immediateAction: object.immediateAction.trim(),
+    evidenceSteps,
+    confidence: object.confidence,
+    actionability: object.actionability as Actionability,
+  }
 }
 
 export function reviewPrompt(report: PostmortemReport): string {
@@ -45,9 +59,9 @@ export function reviewPrompt(report: PostmortemReport): string {
   return [
     'Review only the recorded evidence below. Do not infer a root cause that is not recorded.',
     'Return exactly one JSON object, with no markdown and no additional keys:',
-    '{"summary":"...","immediateAction":"...","evidenceSteps":[1],"confidence":"low|medium|high"}',
+    '{"findingCode":"tool_error","summary":"...","immediateAction":"...","evidenceSteps":[1],"confidence":"low|medium|high","actionability":"actionable|partly_actionable|not_actionable|insufficient_evidence"}',
     'Never request or reveal user content, tool arguments, tool output, files, prompts, or credentials.',
-    JSON.stringify({ turn: report.turn, findings }),
+    JSON.stringify({ turn: report.turn, allowedFindingCodes: report.findings.map(finding => finding.code), findings }),
   ].join('\n')
 }
 
@@ -58,8 +72,9 @@ export async function explainWithModel(
   signal?: AbortSignal,
 ): Promise<ModelReview> {
   const controller = new AbortController()
-  const timer = config.timeoutMs === undefined ? undefined : setTimeout(() => controller.abort(), config.timeoutMs)
-  if (signal !== undefined) signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true })
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs ?? DEFAULT_MODEL_TIMEOUT_MS)
+  const forwardAbort = (): void => controller.abort(signal?.reason)
+  if (signal !== undefined) signal.addEventListener('abort', forwardAbort, { once: true })
   try {
     const request = deepFreeze({
       provider: config.provider,
@@ -76,10 +91,15 @@ export async function explainWithModel(
       .map(block => block.text)
       .join('')
       .trim()
-    const review = parseModelReview(text, report.findings.map(finding => finding.step))
+    const review = parseModelReview(
+      text,
+      report.findings.map(finding => finding.step),
+      report.findings.map(finding => finding.code),
+    )
     if (review === undefined) throw new Error('model returned invalid postmortem JSON')
     return review
   } finally {
-    if (timer !== undefined) clearTimeout(timer)
+    clearTimeout(timer)
+    if (signal !== undefined) signal.removeEventListener('abort', forwardAbort)
   }
 }
