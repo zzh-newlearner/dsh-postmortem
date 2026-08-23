@@ -18,6 +18,7 @@ export interface TurnTrace {
   turn: number
   ended: boolean
   endReason?: string
+  endErrorCode?: string
   endEventSeq?: number
   sourceSeq: number
   toolCalls: ToolCall[]

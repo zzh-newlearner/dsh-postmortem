@@ -92,15 +92,19 @@ Release gates for a task-success claim:
 3. 报告 baseline/postmortem 成功率、差值、paired wins/losses/ties、排除原因、工具调用数与耗时。 / Report baseline success rate, postmortem success rate, success-rate delta, paired wins/losses/ties, excluded-pair reasons, tool-call count, and elapsed time.
 4. 仅当 postmortem 成功率至少提升 5 个百分点、paired wins 多于 losses，且安全检查、工具调用数和耗时没有实质退化时，才宣称有提升；否则结论为无定论或负向。 / Claim an improvement only when postmortem success rises by at least 5 percentage points, paired wins exceed paired losses, and no material regression in safety checks, tool-call count, or elapsed time is observed. Otherwise report the result as inconclusive or negative.
 
-仓库当前的验收范围更窄且可复现：12 条代表性 DSH 事件 fixture、3 条无本地 finding 的干净轨迹、严格的模型 JSON 验证或降级，以及一条真实 `SessionStore + CommandRuntime + LlmRuntime` 组合测试。这些验证插件行为正确，但不虚构未测量的任务成功率结论。
+仓库当前的验收范围更窄且可复现：16 条可追溯的 DSH seed corpus 记录、12 条 schema 级事件 fixture、严格的模型 JSON 验证或降级，以及一条真实 `SessionStore + CommandRuntime + LlmRuntime` 组合测试。这些验证插件行为正确，但不虚构未测量的任务成功率结论。
 
-Current repository acceptance checks are intentionally narrower and reproducible: 12 representative DSH event fixtures, three clean traces with no local finding, strict model-JSON validation or fallback, and one real `SessionStore + CommandRuntime + LlmRuntime` composition test. They establish correct plugin behavior, not an unmeasured task-success claim.
+Current repository acceptance checks are intentionally narrower and reproducible: 16 traceable DSH seed-corpus records, 12 schema-level event fixtures, strict model-JSON validation or fallback, and one real `SessionStore + CommandRuntime + LlmRuntime` composition test. They establish correct plugin behavior, not an unmeasured task-success claim.
 
 ## 评测数据来源 / Evaluation Data Sources
 
-本包不内置外部任务语料，也不会下载语料。12 条 synthetic event fixture 维护在 [`test/fixtures.ts`](test/fixtures.ts)，模拟 DSH 的公开 session event 词汇表。任何外部配对评测在比较结果前，都必须在实验报告中记录数据集来源、版本或 commit hash、许可证或条款、获取日期、任务子集和成功判定器。
+本包包含一个小型、公开可追溯且脱敏的 seed corpus：[`datasets/dsh-public-v0.1.1-rc.2`](datasets/dsh-public-v0.1.1-rc.2)。它包含 7 条从 DeepSeek Harness `dsh-v0.1.1-rc.2` 公开 snapshot fixture 派生的记录，以及 9 条依据公开 DSH session event 词汇表构造的记录。每条记录包含来源路径、revision、MIT 许可证和获取日期；完整的脱敏与标签限制见 [`datasets/README.md`](datasets/README.md)。12 条 schema 级 synthetic fixture 仍维护在 [`test/fixtures.ts`](test/fixtures.ts)。
 
-The package ships no external task corpus and makes no corpus download. Its 12 synthetic event fixtures are maintained in [`test/fixtures.ts`](test/fixtures.ts) and model DSH's public session event vocabulary. Any external paired evaluation must add its dataset source, version or commit hash, license/terms, acquisition date, task subset, and success oracle to its experiment report before results are compared.
+该 corpus 的 `seed` 标签仅由显式事件事实整理，用于防止 parser 和规则回归，不能作为 precision、recall、模型质量或最终任务成功率的独立结论。升级为人工质量 benchmark 前，必须由两名独立审阅者使用 [`diagnosis-annotation-v1`](schemas/diagnosis-annotation-v1.schema.json) 标注主要问题、证据步骤和可行动性，并裁决分歧。任何外部配对评测在比较结果前，都必须在实验报告中记录数据集来源、版本或 commit hash、许可证或条款、获取日期、任务子集和成功判定器。
+
+The package includes one small, public, traceable, redacted seed corpus: [`datasets/dsh-public-v0.1.1-rc.2`](datasets/dsh-public-v0.1.1-rc.2). It contains seven records derived from public DeepSeek Harness `dsh-v0.1.1-rc.2` snapshot fixtures and nine records constructed from the public DSH session-event vocabulary. Every record carries its source path, revision, MIT license, and acquisition date; see [`datasets/README.md`](datasets/README.md) for the complete redaction and label policy. The 12 schema-level synthetic fixtures remain in [`test/fixtures.ts`](test/fixtures.ts).
+
+The corpus's `seed` labels are curated only from explicit event facts, so they protect parser and rule regressions but cannot independently support claims about precision, recall, model quality, or end-task success. Before promotion to a human-quality benchmark, two independent reviewers must use [`diagnosis-annotation-v1`](schemas/diagnosis-annotation-v1.schema.json) to label the primary issue, evidence steps, and actionability, then adjudicate disagreements. Any external paired evaluation must add its dataset source, version or commit hash, license/terms, acquisition date, task subset, and success oracle to its experiment report before results are compared.
 
 ## 开发 / Development
 
@@ -112,9 +116,9 @@ npm run build
 npm pack --dry-run
 ```
 
-本包目标版本为 DSH `0.1.0-rc.6` 和 Cordis `4.0.1`。DSH 仍处于 developer preview；插件以公开 session event 词汇表作为兼容性边界。
+本包目标版本为 DSH `0.1.1-rc.2` 和 Cordis `4.0.1`。DSH 仍处于 developer preview；插件以公开 session event 词汇表作为兼容性边界。
 
-The package targets DSH `0.1.0-rc.6` and Cordis `4.0.1`. DSH is in developer preview; the public session event vocabulary is this plugin's compatibility boundary.
+The package targets DSH `0.1.1-rc.2` and Cordis `4.0.1`. DSH is in developer preview; the public session event vocabulary is this plugin's compatibility boundary.
 
 ## 许可证 / License
 

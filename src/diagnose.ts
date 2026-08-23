@@ -56,7 +56,7 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
     findings.push({
       code: 'turn_failed', severity: 'error', step: Math.max(1, ...trace.toolCalls.map(call => call.step)),
       title: `Turn ended with ${trace.endReason}`, eventSeqs: eventSeqs(trace.endEventSeq),
-      evidence: [`turn_end_reason=${trace.endReason}`],
+      evidence: [`turn_end_reason=${trace.endReason}`, ...(trace.endErrorCode === undefined ? [] : [`turn_error_code=${trace.endErrorCode}`])],
       recommendation: 'Use the earlier tool findings as the first recovery target; do not treat the terminal state as a root cause.',
     })
   }

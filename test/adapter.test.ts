@@ -18,4 +18,11 @@ describe('turnFromEvents', () => {
     ])
     expect(trace.endReason).toBe('completed')
   })
+
+  it('keeps the latest DSH turn error code without retaining its message', () => {
+    const trace = turnFromEvents('session-1', 3, [
+      { type: 'turn/end', seq: 8, data: { turn: 3, reason: { kind: 'error', error: { code: 'MISSING_CREDENTIAL', message: 'private detail' } } } },
+    ])
+    expect(trace.endErrorCode).toBe('MISSING_CREDENTIAL')
+  })
 })

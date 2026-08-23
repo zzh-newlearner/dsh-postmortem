@@ -18,6 +18,7 @@ function objectValue(value: unknown): Record<string, unknown> | undefined {
 export function turnFromEvents(sessionId: string, turn: number, events: readonly RecordedEvent[]): TurnTrace {
   const calls = new Map<string, ToolCall>()
   let endReason: string | undefined
+  let endErrorCode: string | undefined
   let endEventSeq: number | undefined
   let sourceSeq = 0
   for (const event of events) {
@@ -63,6 +64,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
     if (event.type === 'turn/end') {
       const reason = objectValue(event.data.reason)
       endReason = stringValue(reason?.kind) ?? 'unknown'
+      endErrorCode = stringValue(objectValue(reason?.error)?.code)
       endEventSeq = event.seq
     }
   }
@@ -71,6 +73,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
     turn,
     ended: endReason !== undefined,
     endReason,
+    endErrorCode,
     endEventSeq,
     sourceSeq,
     toolCalls: [...calls.values()].sort((left, right) => left.step - right.step || left.callId.localeCompare(right.callId)),
