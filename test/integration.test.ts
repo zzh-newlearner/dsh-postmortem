@@ -25,9 +25,9 @@ describe('real DSH composition', () => {
     session.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'tool failed', code: 'UNKNOWN' } } })
 
     const agent = { id: session.id, session, ctx } as never
-    const report = await ctx.commands.execute(agent, '/postmortem', new AbortController().signal)
-    const exported = await ctx.commands.execute(agent, '/postmortem-export 1', new AbortController().signal)
-    const repair = await ctx.commands.execute(agent, '/postmortem-repair 1', new AbortController().signal)
+    const report = await ctx.commands.execute(agent, '/postmortem', [], new AbortController().signal)
+    const exported = await ctx.commands.execute(agent, '/postmortem-export 1', [], new AbortController().signal)
+    const repair = await ctx.commands.execute(agent, '/postmortem-repair 1', [], new AbortController().signal)
 
     expect(report?.result).toMatchObject({ kind: 'success' })
     expect(report?.result.text).toContain('Tool shell failed')

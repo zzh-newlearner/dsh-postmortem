@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Fixes the DSH `0.1.1-rc.2` composition test for the current command attachment parameter.
+
 ## 0.4.0
 
 - Adds a versioned, redacted 16-record DSH seed corpus with source paths, revision, license, and acquisition date.
