@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DSH Postmortem Repair Plan",
+  "type": "object",
+  "required": ["schemaVersion", "sessionId", "turn", "sourceSeq", "actions"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "sessionId": { "type": "string" },
+    "turn": { "type": "integer", "minimum": 0 },
+    "sourceSeq": { "type": "integer", "minimum": 0 },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "findingCode", "step", "kind", "execution", "action", "verification"],
+        "properties": {
+          "id": { "type": "string" },
+          "findingCode": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "model_retry"] },
+          "step": { "type": "integer", "minimum": 0 },
+          "kind": { "enum": ["check_resource", "check_permission", "check_external_state", "inspect_tool_arguments", "stop_unchanged_retry", "correct_credential", "wait_for_rate_limit", "reduce_context", "review_prior_findings"] },
+          "execution": { "const": "copy_only" },
+          "action": { "type": "string" },
+          "verification": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

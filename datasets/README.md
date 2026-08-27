@@ -33,3 +33,15 @@ For human review, create one annotation per reviewer using [`schemas/diagnosis-a
 The stable evaluation split is `sha256(record id)` modulo five: holdout when the first byte is zero, otherwise development. It is intended to prevent record movement while the corpus grows, not to make the seed labels into a benchmark.
 
 稳定评测划分使用 `sha256(record id)` 的首字节模五：为零时是 holdout，否则为 development。它用于确保语料增长时已有记录不移动，不会把 seed 标签变成 benchmark。
+
+## Synthetic Paired Fixture / 合成配对 Fixture
+
+`synthetic-paired-v1` contains eight fully synthetic baseline/postmortem pairs. It is authored in this repository on 2026-08-27, licensed MIT, and has no external source or user trace. Its only purpose is to regression-test paired-run matching and aggregation, including a negative control. Run `npm run eval:paired` to inspect it. Its reported delta is not evidence that the plugin improves real DSH task success.
+
+`synthetic-paired-v1` 包含八组完全合成的 baseline/postmortem 配对。它于 2026-08-27 在本仓库编写，采用 MIT 许可证，不含外部来源或用户轨迹。其唯一目的，是回归测试配对运行的匹配与聚合，包括负对照。运行 `npm run eval:paired` 可查看它。其 delta 不是本插件提升真实 DSH 任务成功率的证据。
+
+## Synthetic Verified-Pair Fixture / 合成严格配对 Fixture
+
+`synthetic-verified-paired-v1` contains four fully synthetic pairs authored in this repository on 2026-08-27 under MIT. One pair is eligible; the others deliberately differ in environment, omit a repair-plan fingerprint, or differ in success criterion. Run `npm run eval:verified` to ensure those records are excluded. It tests protocol enforcement only and is not evidence of task-success improvement.
+
+`synthetic-verified-paired-v1` 包含四组完全合成的严格配对，于 2026-08-27 在本仓库编写，采用 MIT。其中一组符合条件；其余分别故意改变环境、遗漏修复计划指纹或改变成功判据。运行 `npm run eval:verified` 可确保这些记录被排除。它只测试协议执行，不是任务成功率提升的证据。

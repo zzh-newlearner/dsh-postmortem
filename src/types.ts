@@ -62,6 +62,37 @@ export interface ModelReview {
   actionability: Actionability
 }
 
+export type RepairActionKind =
+  | 'check_resource'
+  | 'check_permission'
+  | 'check_external_state'
+  | 'inspect_tool_arguments'
+  | 'stop_unchanged_retry'
+  | 'correct_credential'
+  | 'wait_for_rate_limit'
+  | 'reduce_context'
+  | 'review_prior_findings'
+
+export interface RepairAction {
+  id: string
+  findingCode: FindingCode
+  step: number
+  kind: RepairActionKind
+  /** All actions are advisory; none are executed by this plugin. */
+  execution: 'copy_only'
+  action: string
+  verification: string
+}
+
+/** A redacted, runner-neutral plan derived only from deterministic findings. */
+export interface RepairPlan {
+  schemaVersion: '1'
+  sessionId: string
+  turn: number
+  sourceSeq: number
+  actions: RepairAction[]
+}
+
 export type ModelState = 'disabled' | 'skipped_clean' | 'pending' | 'completed' | 'failed'
 
 export interface PostmortemReport {

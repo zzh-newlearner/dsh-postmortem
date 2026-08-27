@@ -7,6 +7,11 @@ function canonicalJson(value: unknown): string {
   return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(',')}}`
 }
 
+/** Hash structured, redacted metadata without retaining the original value. */
+export function stableFingerprint(value: unknown): string {
+  return `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`
+}
+
 /**
  * Produce a one-way, stable key for retry detection. Raw tool arguments never
  * enter a TurnTrace, cache, report, or model prompt.
@@ -19,5 +24,5 @@ export function argumentFingerprint(argumentsText: string | undefined): string |
   } catch {
     // Invalid JSON is still comparable without exposing its original content.
   }
-  return `sha256:${createHash('sha256').update(normalized).digest('hex')}`
+  return stableFingerprint(normalized)
 }

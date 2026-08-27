@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1",
+  "name": "synthetic-verified-paired-v1",
+  "recordCount": 8,
+  "pairCount": 4,
+  "origin": "synthetic protocol fixture",
+  "license": "MIT",
+  "createdAt": "2026-08-27",
+  "purpose": "Regression-test strict verified-pair eligibility. Not evidence of task-success improvement."
+}

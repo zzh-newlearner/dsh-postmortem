@@ -24,6 +24,10 @@ Then use `/postmortem-repair` to get a copy-only recovery prompt. It tells the n
 
 随后执行 `/postmortem-repair` 获取仅供复制的恢复提示。它会要求下一次 agent 尝试先验证缺失资源，并禁止原样重复失败调用。
 
+Use `/postmortem-plan` when a runner needs the same advice as strict, redacted JSON: every action includes its evidence category, an advisory action, and a verification step. Plans are copy-only and are never executed by this package.
+
+当外部 runner 需要严格、脱敏的 JSON 建议时，使用 `/postmortem-plan`。每项动作都包含证据类别、建议动作与验证步骤；计划仅供复制，本包永不执行它们。
+
 The output contains no user messages, tool arguments, tool output, files, prompts, credentials, or raw traces. Run the same redacted demonstration locally with `npm run build && npm run demo`.
 
 输出不包含用户消息、工具参数、工具输出、文件、提示词、凭据或原始轨迹。可通过 `npm run build && npm run demo` 在本地运行同一脱敏演示。
@@ -70,12 +74,13 @@ To enable the optional model review, add this override to that profile's `cordis
 | Command / 命令 | Use / 用途 |
 | --- | --- |
 | `/postmortem [turn]` | Read a concise local report for the latest or selected turn, including a scheduled model retry before a turn ends. / 查看最近或指定轮次的本地报告；在轮次结束前也会显示已调度的模型重试。 |
+| `/postmortem-plan [turn]` | Export schema-v1 copy-only repair actions with verification steps for a detected failure. / 导出带验证步骤的 schema-v1 仅复制修复动作。 |
 | `/postmortem-repair [turn]` | Copy a bounded recovery prompt for a detected failure. / 复制针对已检测故障的受限恢复提示。 |
 | `/postmortem-export [turn]` | Export a redacted schema-v2 report for issue filing or evaluation. / 导出脱敏 schema-v2 报告，用于提交 issue 或评测。 |
 
-Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. The repair command only returns text. It never retries a tool, changes the agent loop, injects a follow-up, or becomes model context.
+Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. The repair commands only return text or JSON. They never retry a tool, change the agent loop, inject a follow-up, or become model context.
 
-命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。修复命令只返回文本，不会重试工具、改变 agent loop、注入 follow-up 或进入模型上下文。
+命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。修复命令只返回文本或 JSON，不会重试工具、改变 agent loop、注入 follow-up 或进入模型上下文。
 
 When DSH has scheduled a provider retry, `/postmortem` returns immediate local status instead of waiting for a terminal turn. It retains only retry count, step, delay, mode, finite retry budget, and error code; provider details and failure messages are discarded. This live status never invokes the optional review model or emits a repair prompt.
 
@@ -113,9 +118,17 @@ The package has 24 versioned seed records: 15 redacted records derived from publ
 
 本包包含 24 条版本化 seed 记录：15 条由公开 DSH `dsh-v0.1.1-rc.2` snapshot 或测试 fixture 脱敏派生，9 条依据公开 session event 词汇表构造。每条记录都包含来源路径、revision、MIT 许可证与获取日期。来源和脱敏策略见 [datasets/README.md](datasets/README.md)。
 
-Seed labels protect deterministic parser and rule regressions. They are not a claim of precision, recall, model quality, or task-success improvement. Those claims require double-reviewed or adjudicated human holdout labels and a paired runner evaluation. The published schemas are [annotations](schemas/diagnosis-annotation-v1.schema.json), [adjudication](schemas/diagnosis-adjudication-v1.schema.json), and [paired runs](schemas/paired-run-v1.schema.json).
+Seed labels protect deterministic parser and rule regressions. They are not a claim of precision, recall, model quality, or task-success improvement. Those claims require double-reviewed or adjudicated human holdout labels and a paired runner evaluation. The published schemas are [annotations](schemas/diagnosis-annotation-v1.schema.json), [adjudication](schemas/diagnosis-adjudication-v1.schema.json), [paired runs](schemas/paired-run-v1.schema.json), and [repair plans](schemas/repair-plan-v1.schema.json).
 
-Seed 标签用于防止确定性 parser 与规则回归，不能作为 precision、recall、模型质量或任务成功率提升的结论。这些结论需要双人审阅或裁决的人工留出集标签，以及配对 runner 评测。已发布 [标注](schemas/diagnosis-annotation-v1.schema.json)、[裁决](schemas/diagnosis-adjudication-v1.schema.json) 与 [配对运行](schemas/paired-run-v1.schema.json) schema。
+Seed 标签用于防止确定性 parser 与规则回归，不能作为 precision、recall、模型质量或任务成功率提升的结论。这些结论需要双人审阅或裁决的人工留出集标签，以及配对 runner 评测。已发布 [标注](schemas/diagnosis-annotation-v1.schema.json)、[裁决](schemas/diagnosis-adjudication-v1.schema.json)、[配对运行](schemas/paired-run-v1.schema.json) 与 [修复计划](schemas/repair-plan-v1.schema.json) schema。
+
+`datasets/synthetic-paired-v1` is a transparent, synthetic fixture for the paired evaluator. Run `npm run eval:paired` to validate matching, exclusions, wins, ties, and losses. Its numeric output is deliberately **not** a product-success metric; only pre-registered, matched DSH task reruns may support that claim.
+
+`datasets/synthetic-paired-v1` 是配对评测器的透明合成 fixture。运行 `npm run eval:paired` 可验证匹配、排除、胜出、平局与失败。其数值输出刻意**不是**产品成功率指标；只有预注册、匹配的 DSH 任务重放才能支持该结论。
+
+For a task-success claim, use `evaluateVerifiedPairs()` and the [verified-pair schema](schemas/verified-paired-run-v1.schema.json). It rejects a pair unless both arms share a protocol ID, task fingerprint, environment fingerprint, and success-criterion fingerprint; baseline must have no intervention, while the postmortem arm must identify a repair-plan fingerprint. Run `npm run eval:verified` to inspect the synthetic negative controls. This checks experiment integrity, not whether a task runner itself is correct.
+
+若要声明任务成功率提升，请使用 `evaluateVerifiedPairs()` 和 [严格配对 schema](schemas/verified-paired-run-v1.schema.json)。除非两臂共享 protocol ID、任务指纹、环境指纹和成功判据指纹，否则评测器会排除该配对；baseline 不得有干预，postmortem 臂必须标识修复计划指纹。运行 `npm run eval:verified` 可查看合成负对照。它检查实验完整性，而不验证任务 runner 本身是否正确。
 
 For an OpenAI-compatible model protocol smoke test, use the redacted-only runner below. It preflights models, round-robins work fairly, and opens a rate-limit circuit after the first 429.
 
@@ -137,12 +150,14 @@ npm test
 npm run build
 npm run demo
 npm run selfcheck:dsh
+npm run eval:paired
+npm run eval:verified
 npm pack --dry-run
 ```
 
-`npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the three user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
+`npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the four user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
 
-`npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证三个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
+`npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证四个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
 
 ## License / 许可证
 

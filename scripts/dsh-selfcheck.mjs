@@ -31,11 +31,15 @@ const agent = { id: session.id, session, ctx }
 const signal = new AbortController().signal
 const report = requiredText(await ctx.commands.execute(agent, '/postmortem', [], signal), 'postmortem')
 const exported = requiredText(await ctx.commands.execute(agent, '/postmortem-export 1', [], signal), 'postmortem-export')
+const plan = requiredText(await ctx.commands.execute(agent, '/postmortem-plan 1', [], signal), 'postmortem-plan')
 const repair = requiredText(await ctx.commands.execute(agent, '/postmortem-repair 1', [], signal), 'postmortem-repair')
-const combined = `${report}\n${exported}\n${repair}`
+const combined = `${report}\n${exported}\n${plan}\n${repair}`
 
 if (!report.includes('Tool shell failed') || !repair.includes('Do not repeat an unchanged failing tool call')) {
   throw new Error('expected diagnostic or recovery guidance is missing')
+}
+if (!plan.includes('"execution": "copy_only"') || !plan.includes('"verification"')) {
+  throw new Error('repair plan did not preserve its copy-only and verification boundaries')
 }
 if (combined.includes('private-command') || combined.includes('private tool output') || combined.includes('private terminal message')) {
   throw new Error('private trace data escaped the postmortem boundary')
@@ -43,4 +47,4 @@ if (combined.includes('private-command') || combined.includes('private tool outp
 if (session.events.some(event => event.type === 'agent/inject')) throw new Error('self-check unexpectedly injected agent context')
 
 console.log(report)
-console.log('\nDSH command-path self-check passed: report, export, repair, redaction, and no injection.')
+console.log('\nDSH command-path self-check passed: report, export, plan, repair, redaction, and no injection.')

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0
+
+- Adds a strict verified-pair evaluation contract that requires matching protocol, task, environment, and success-criterion fingerprints across arms.
+- Requires the postmortem arm to identify a one-way repair-plan fingerprint and rejects baseline records that claim an intervention.
+- Adds `npm run eval:verified` with synthetic negative controls that exercise strict eligibility without claiming a task-success uplift.
+
+## 0.7.0
+
+- Adds `/postmortem-plan`, a schema-v1, redacted, copy-only repair-plan export with explicit verification steps.
+- Adds deterministic mappings for resource, permission, external-state, credential, rate-limit, context-budget, and retry-loop recovery actions; the plugin still never executes a repair.
+- Adds a source-labelled synthetic paired-evaluation fixture and `npm run eval:paired` to regression-test the paired evaluator without claiming real task-success uplift.
+
 ## 0.6.3
 
 - Adds immediate, redacted `/postmortem` status for an open DSH turn with a scheduled provider retry, without waiting for terminal failure or invoking the optional review model.

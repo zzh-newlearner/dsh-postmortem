@@ -6,20 +6,23 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { turnFromEvents } from './adapter.js'
 import { diagnose, formatReport } from './diagnose.js'
 import { explainWithModel, type ModelConfig } from './explain.js'
-import { buildRepairPrompt } from './repair.js'
+import { buildRepairPlan, buildRepairPrompt } from './repair.js'
 import { PostmortemStore } from './store.js'
 import type { PostmortemReport, RecordedEvent } from './types.js'
 
 export { turnFromEvents } from './adapter.js'
 export { diagnose, formatReport } from './diagnose.js'
 export { explainWithModel, parseModelReview, reviewPrompt, type ModelConfig } from './explain.js'
-export { buildRepairPrompt } from './repair.js'
+export { buildRepairPlan, buildRepairPrompt, repairPlanFingerprint } from './repair.js'
 export { summarizeAnnotations, validateDiagnosisAdjudication, validateDiagnosisAnnotation } from './annotations.js'
 export { evaluationSplit, scoreDiagnosisCorpus, validateDiagnosisDatasetRecord } from './dataset.js'
 export { evaluatePairs } from './evaluation.js'
+export { evaluateVerifiedPairs, validateVerifiedPairedRunRecord } from './verified-evaluation.js'
 export { ModelEvaluationError, evaluateModelReviews, humanReferences, seedReferences, summarizeModelEvaluationRecords } from './model-eval.js'
 export { PostmortemStore } from './store.js'
 export type { PairedEvaluation, PairedRunRecord, PairIssue } from './evaluation.js'
+export type { VerifiedPairedEvaluation, VerifiedPairedRunRecord } from './verified-evaluation.js'
+export type { RepairAction, RepairActionKind, RepairPlan } from './types.js'
 export type { DatasetExpectation, DatasetOrigin, DatasetOriginKind, DiagnosisCorpusScore, DiagnosisDatasetRecord, EvaluationSplit } from './dataset.js'
 export type { AnnotationIssue, AnnotationPrimaryIssue, AnnotationSummary, DiagnosisAdjudication, DiagnosisAnnotation, HumanReference } from './annotations.js'
 export type { ModelEvaluationCaller, ModelEvaluationCase, ModelEvaluationOptions, ModelEvaluationRecord, ModelEvaluationReference, ModelEvaluationRun, ModelEvaluationSummary } from './model-eval.js'
@@ -88,6 +91,22 @@ export function apply(ctx: Context, config: Config = {}): void {
   const store = new PostmortemStore()
   const logger = ctx.logger('dsh-postmortem')
   const llm = ctx.llm as LlmRuntime
+
+  ctx.commands.register({
+    name: 'postmortem-plan',
+    description: 'Export a copy-only, machine-readable repair plan for a failed turn.',
+    input: { hint: '[turn]' },
+    recordInput: false,
+    async handler({ agent, rawInput, signal }) {
+      const turn = turnArgument(rawInput, agent.session)
+      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-plan [turn]' }
+      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
+      const plan = buildRepairPlan(report)
+      return plan === undefined
+        ? { kind: 'error', text: 'No actionable repair plan is available for this turn.' }
+        : { kind: 'success', text: JSON.stringify(plan, null, 2) }
+    },
+  })
 
   ctx.commands.register({
     name: 'postmortem',

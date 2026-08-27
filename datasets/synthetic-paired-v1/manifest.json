@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1",
+  "name": "synthetic-paired-v1",
+  "recordCount": 16,
+  "pairCount": 8,
+  "origin": "synthetic evaluation fixture",
+  "license": "MIT",
+  "createdAt": "2026-08-27",
+  "purpose": "Regression-test paired evaluation validation and aggregation. Not evidence of task-success improvement."
+}

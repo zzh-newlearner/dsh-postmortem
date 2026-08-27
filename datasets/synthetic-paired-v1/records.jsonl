@@ -1,0 +1,16 @@
+{"schemaVersion":"1","pairId":"synthetic-pair-01","taskId":"synthetic-resource-check","arm":"baseline","success":false,"taskFingerprint":"sha256:synthetic-resource-check","toolCalls":3,"elapsedMs":1200}
+{"schemaVersion":"1","pairId":"synthetic-pair-01","taskId":"synthetic-resource-check","arm":"postmortem","success":true,"taskFingerprint":"sha256:synthetic-resource-check","toolCalls":2,"elapsedMs":900}
+{"schemaVersion":"1","pairId":"synthetic-pair-02","taskId":"synthetic-permission-check","arm":"baseline","success":false,"taskFingerprint":"sha256:synthetic-permission-check","toolCalls":2,"elapsedMs":800}
+{"schemaVersion":"1","pairId":"synthetic-pair-02","taskId":"synthetic-permission-check","arm":"postmortem","success":true,"taskFingerprint":"sha256:synthetic-permission-check","toolCalls":2,"elapsedMs":1000}
+{"schemaVersion":"1","pairId":"synthetic-pair-03","taskId":"synthetic-rate-limit","arm":"baseline","success":false,"taskFingerprint":"sha256:synthetic-rate-limit","toolCalls":4,"elapsedMs":3000}
+{"schemaVersion":"1","pairId":"synthetic-pair-03","taskId":"synthetic-rate-limit","arm":"postmortem","success":true,"taskFingerprint":"sha256:synthetic-rate-limit","toolCalls":2,"elapsedMs":1800}
+{"schemaVersion":"1","pairId":"synthetic-pair-04","taskId":"synthetic-unrecoverable","arm":"baseline","success":false,"taskFingerprint":"sha256:synthetic-unrecoverable","toolCalls":1,"elapsedMs":400}
+{"schemaVersion":"1","pairId":"synthetic-pair-04","taskId":"synthetic-unrecoverable","arm":"postmortem","success":false,"taskFingerprint":"sha256:synthetic-unrecoverable","toolCalls":1,"elapsedMs":450}
+{"schemaVersion":"1","pairId":"synthetic-pair-05","taskId":"synthetic-clean","arm":"baseline","success":true,"taskFingerprint":"sha256:synthetic-clean","toolCalls":2,"elapsedMs":500}
+{"schemaVersion":"1","pairId":"synthetic-pair-05","taskId":"synthetic-clean","arm":"postmortem","success":true,"taskFingerprint":"sha256:synthetic-clean","toolCalls":2,"elapsedMs":510}
+{"schemaVersion":"1","pairId":"synthetic-pair-06","taskId":"synthetic-context-budget","arm":"baseline","success":false,"taskFingerprint":"sha256:synthetic-context-budget","toolCalls":2,"elapsedMs":1500}
+{"schemaVersion":"1","pairId":"synthetic-pair-06","taskId":"synthetic-context-budget","arm":"postmortem","success":true,"taskFingerprint":"sha256:synthetic-context-budget","toolCalls":2,"elapsedMs":1300}
+{"schemaVersion":"1","pairId":"synthetic-pair-07","taskId":"synthetic-stable-success","arm":"baseline","success":true,"taskFingerprint":"sha256:synthetic-stable-success","toolCalls":1,"elapsedMs":300}
+{"schemaVersion":"1","pairId":"synthetic-pair-07","taskId":"synthetic-stable-success","arm":"postmortem","success":true,"taskFingerprint":"sha256:synthetic-stable-success","toolCalls":1,"elapsedMs":320}
+{"schemaVersion":"1","pairId":"synthetic-pair-08","taskId":"synthetic-negative-control","arm":"baseline","success":true,"taskFingerprint":"sha256:synthetic-negative-control","toolCalls":1,"elapsedMs":250}
+{"schemaVersion":"1","pairId":"synthetic-pair-08","taskId":"synthetic-negative-control","arm":"postmortem","success":false,"taskFingerprint":"sha256:synthetic-negative-control","toolCalls":1,"elapsedMs":290}
