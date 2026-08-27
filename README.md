@@ -130,8 +130,13 @@ npm run typecheck
 npm test
 npm run build
 npm run demo
+npm run selfcheck:dsh
 npm pack --dry-run
 ```
+
+`npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the three user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
+
+`npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证三个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
 
 ## License / 许可证
 

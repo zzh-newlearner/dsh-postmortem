@@ -1,6 +1,6 @@
 {
   "name": "@huichangzz/dsh-postmortem",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Explain failed DeepSeek Harness agent runs locally, then produce a redacted recovery plan. No model required.",
   "license": "MIT",
   "type": "module",
@@ -47,6 +47,7 @@
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run",
     "demo": "node scripts/demo.mjs",
+    "selfcheck:dsh": "npm run build && node scripts/dsh-selfcheck.mjs",
     "eval:models": "node scripts/model-eval.mjs"
   }
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Adds a runnable DSH command-path self-check that exercises the built package through `Context`, `SessionStore`, `CommandRuntime`, and `LlmRuntime`.
+- Verifies report, export, repair, redaction, and the no-injection boundary against one redacted failed turn.
+
 ## 0.6.0
 
 - Reframes the bilingual README around a 60-second install path, real redacted command output, and explicit recovery value.
