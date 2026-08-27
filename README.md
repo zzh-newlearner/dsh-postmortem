@@ -69,13 +69,17 @@ To enable the optional model review, add this override to that profile's `cordis
 
 | Command / 命令 | Use / 用途 |
 | --- | --- |
-| `/postmortem [turn]` | Read a concise local report for the latest or selected turn. / 查看最近或指定轮次的本地报告。 |
+| `/postmortem [turn]` | Read a concise local report for the latest or selected turn, including a scheduled model retry before a turn ends. / 查看最近或指定轮次的本地报告；在轮次结束前也会显示已调度的模型重试。 |
 | `/postmortem-repair [turn]` | Copy a bounded recovery prompt for a detected failure. / 复制针对已检测故障的受限恢复提示。 |
 | `/postmortem-export [turn]` | Export a redacted schema-v2 report for issue filing or evaluation. / 导出脱敏 schema-v2 报告，用于提交 issue 或评测。 |
 
 Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. The repair command only returns text. It never retries a tool, changes the agent loop, injects a follow-up, or becomes model context.
 
 命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。修复命令只返回文本，不会重试工具、改变 agent loop、注入 follow-up 或进入模型上下文。
+
+When DSH has scheduled a provider retry, `/postmortem` returns immediate local status instead of waiting for a terminal turn. It retains only retry count, step, delay, mode, finite retry budget, and error code; provider details and failure messages are discarded. This live status never invokes the optional review model or emits a repair prompt.
+
+当 DSH 已调度 provider 重试时，`/postmortem` 会立即返回本地状态，无需等待 turn 终止。它仅保留重试次数、步骤、延迟、模式、有限重试预算和错误码；provider 细节与失败消息都会被丢弃。该实时状态不会调用可选复盘模型，也不会生成 repair prompt。
 
 ## Built For, Not Around / 适合什么，不做什么
 

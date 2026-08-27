@@ -1,4 +1,4 @@
-import type { RecordedEvent, ToolCall, TurnTrace } from './types.js'
+import type { PendingModelRetry, RecordedEvent, ToolCall, TurnTrace } from './types.js'
 import { argumentFingerprint } from './fingerprint.js'
 
 function stringValue(value: unknown): string | undefined {
@@ -22,6 +22,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
   let endErrorCode: string | undefined
   let endAbortCause: string | undefined
   let endEventSeq: number | undefined
+  let pendingModelRetry: PendingModelRetry | undefined
   let sourceSeq = 0
   for (const event of events) {
     const eventTurn = numberValue(event.data.turn)
@@ -70,6 +71,32 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
       endAbortCause = stringValue(objectValue(reason?.reason)?.kind)
       endEventSeq = event.seq
     }
+    if (event.type === 'llm/retry') {
+      const step = numberValue(event.data.step)
+      const retry = numberValue(event.data.retry)
+      const delayMs = numberValue(event.data.delayMs)
+      const mode = stringValue(event.data.mode)
+      const maxRetries = numberValue(event.data.maxRetries)
+      const failure = objectValue(event.data.failure)
+      if (step !== undefined && retry !== undefined && retry > 0 && delayMs !== undefined
+        && (mode === 'normal' || mode === 'always')) {
+        const errorCode = stringValue(failure?.code)
+        pendingModelRetry = {
+          step,
+          retry,
+          delayMs,
+          mode,
+          ...(maxRetries === undefined ? {} : { maxRetries }),
+          ...(errorCode === undefined ? {} : { errorCode }),
+          ...(event.seq === undefined ? {} : { eventSeq: event.seq }),
+        }
+      }
+    }
+    if (event.type === 'llm/retry-started' && pendingModelRetry !== undefined) {
+      const step = numberValue(event.data.step)
+      const retry = numberValue(event.data.retry)
+      if (step === pendingModelRetry.step && retry === pendingModelRetry.retry) pendingModelRetry = undefined
+    }
   }
   return {
     sessionId,
@@ -81,5 +108,6 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
     endEventSeq,
     sourceSeq,
     toolCalls: [...calls.values()].sort((left, right) => left.step - right.step || left.callId.localeCompare(right.callId)),
+    ...(endReason === undefined && pendingModelRetry !== undefined ? { pendingModelRetry } : {}),
   }
 }

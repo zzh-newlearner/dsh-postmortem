@@ -13,6 +13,17 @@ export interface ToolCall {
   errorCode?: string
 }
 
+/** Redacted status of one DSH provider retry that has been scheduled but not started. */
+export interface PendingModelRetry {
+  step: number
+  retry: number
+  delayMs: number
+  mode: 'normal' | 'always'
+  maxRetries?: number
+  errorCode?: string
+  eventSeq?: number
+}
+
 export interface TurnTrace {
   sessionId: string
   turn: number
@@ -23,9 +34,10 @@ export interface TurnTrace {
   endEventSeq?: number
   sourceSeq: number
   toolCalls: ToolCall[]
+  pendingModelRetry?: PendingModelRetry
 }
 
-export type FindingCode = 'tool_error' | 'retry_loop' | 'missing_result' | 'turn_failed'
+export type FindingCode = 'tool_error' | 'retry_loop' | 'missing_result' | 'turn_failed' | 'model_retry'
 export type Actionability = 'actionable' | 'partly_actionable' | 'not_actionable' | 'insufficient_evidence'
 export type PostmortemDecision = 'detected' | 'clean' | 'cancelled' | 'inconclusive'
 

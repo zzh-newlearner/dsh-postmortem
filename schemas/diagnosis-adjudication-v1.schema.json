@@ -10,7 +10,7 @@
     "recordId": { "type": "string", "minLength": 1 },
     "adjudicatorId": { "type": "string", "minLength": 1, "description": "Pseudonymous adjudicator identifier; do not use a personal name or email." },
     "reviewerIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 2, "maxItems": 2, "uniqueItems": true },
-    "primaryIssue": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "none", "other", "cancelled"] },
+    "primaryIssue": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "model_retry", "none", "other", "cancelled"] },
     "evidenceSteps": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
     "actionability": { "enum": ["actionable", "partly_actionable", "not_actionable", "insufficient_evidence"] },
     "notes": { "type": "string", "maxLength": 500, "description": "Do not include secrets, user content, raw tool input, raw tool output, paths, or credentials." }

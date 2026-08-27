@@ -47,7 +47,7 @@ export interface AnnotationSummary {
 }
 
 const PRIMARY_ISSUES = new Set<AnnotationPrimaryIssue>([
-  'tool_error', 'retry_loop', 'missing_result', 'turn_failed', 'none', 'other', 'cancelled',
+  'tool_error', 'retry_loop', 'missing_result', 'turn_failed', 'model_retry', 'none', 'other', 'cancelled',
 ])
 const ACTIONABILITY = new Set<Actionability>([
   'actionable', 'partly_actionable', 'not_actionable', 'insufficient_evidence',

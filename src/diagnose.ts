@@ -54,6 +54,24 @@ function terminalRecommendation(reason: string, code: string | undefined): strin
 export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'): PostmortemReport {
   const findings: Finding[] = []
   const cancelled = userCancelled(trace)
+  if (!trace.ended && trace.pendingModelRetry !== undefined) {
+    const retry = trace.pendingModelRetry
+    const recommendation = retry.mode === 'always'
+      ? 'This provider is configured to retry indefinitely; cancel the run if continued attempts are not appropriate.'
+      : `Wait for the scheduled retry or cancel the run; this is retry ${retry.retry} of ${retry.maxRetries ?? 'an unknown budget'}.`
+    findings.push({
+      code: 'model_retry', severity: 'warning', step: retry.step,
+      title: `Model request retry ${retry.retry} is scheduled`,
+      eventSeqs: eventSeqs(retry.eventSeq),
+      evidence: [
+        `retry_mode=${retry.mode}`,
+        `retry_delay_ms=${retry.delayMs}`,
+        ...(retry.maxRetries === undefined ? [] : [`retry_max=${retry.maxRetries}`]),
+        ...(retry.errorCode === undefined ? [] : [`model_error_code=${retry.errorCode}`]),
+      ],
+      recommendation,
+    })
+  }
   for (const call of trace.toolCalls) {
     if (call.isError && !(cancelled && cancellationError(call.errorCode))) {
       findings.push({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { diagnose, formatReport } from '../src/diagnose.js'
 import { argumentFingerprint } from '../src/fingerprint.js'
+import { buildRepairPrompt } from '../src/repair.js'
 
 describe('diagnose', () => {
   it('reports a failing tool and failed turn', () => {
@@ -41,5 +42,24 @@ describe('diagnose', () => {
   it('uses a bounded recovery recommendation for known public error codes', () => {
     const report = diagnose({ sessionId: 's1', turn: 1, sourceSeq: 1, ended: true, endReason: 'error', endErrorCode: 'RATE_LIMIT', toolCalls: [] })
     expect(report.findings[0]?.recommendation).toContain('reduce request pressure')
+  })
+
+  it('reports a scheduled model retry without treating it as a terminal repair', () => {
+    const report = diagnose({
+      sessionId: 's1', turn: 1, sourceSeq: 8, ended: false, toolCalls: [],
+      pendingModelRetry: { step: 2, retry: 1, delayMs: 500, mode: 'normal', maxRetries: 5, errorCode: 'RATE_LIMIT', eventSeq: 8 },
+    })
+    expect(report.decision).toBe('detected')
+    expect(report.findings).toMatchObject([{ code: 'model_retry', severity: 'warning', step: 2 }])
+    expect(formatReport(report)).toContain('Model request retry 1 is scheduled')
+    expect(buildRepairPrompt(report)).toBeUndefined()
+  })
+
+  it('warns when a provider is configured to retry indefinitely', () => {
+    const report = diagnose({
+      sessionId: 's1', turn: 1, sourceSeq: 8, ended: false, toolCalls: [],
+      pendingModelRetry: { step: 2, retry: 4, delayMs: 10_000, mode: 'always', eventSeq: 8 },
+    })
+    expect(report.findings[0]?.recommendation).toContain('retry indefinitely')
   })
 })

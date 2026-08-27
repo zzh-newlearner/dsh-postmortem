@@ -37,4 +37,18 @@ describe('turnFromEvents', () => {
     expect(trace.toolCalls[0]?.argumentFingerprint).toBe(trace.toolCalls[1]?.argumentFingerprint)
     expect(trace.endAbortCause).toBe('user')
   })
+
+  it('projects a scheduled model retry without retaining its provider or failure message', () => {
+    const trace = turnFromEvents('session-1', 5, [
+      { type: 'llm/retry', seq: 9, data: {
+        turn: 5, step: 2, retry: 1, delayMs: 500, mode: 'normal', maxRetries: 5,
+        provider: 'private-provider', policyKey: 'private-policy', retryId: 'private-id',
+        failure: { code: 'RATE_LIMIT', message: 'private provider response' },
+      } },
+    ])
+    expect(trace.pendingModelRetry).toEqual({
+      step: 2, retry: 1, delayMs: 500, mode: 'normal', maxRetries: 5, errorCode: 'RATE_LIMIT', eventSeq: 9,
+    })
+    expect(JSON.stringify(trace)).not.toContain('private')
+  })
 })

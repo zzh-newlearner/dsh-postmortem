@@ -37,4 +37,32 @@ describe('real DSH composition', () => {
     expect(repair?.result.text).toContain('Do not repeat an unchanged failing tool call')
     expect(session.events.map(event => event.type)).not.toContain('agent/inject')
   })
+
+  it('reports an open scheduled model retry without calling a review model', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(CommandRuntime)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin({ name: 'dsh-postmortem', inject: ['commands', 'sessions', 'llm'], apply }, {
+      autoOnFailure: false,
+      model: { enabled: true, provider: 'unconfigured', model: 'unconfigured' },
+    })
+    const session = ctx.sessions.create(SessionId('postmortem-retry-status'))
+    session.append('turn/start', { turn: 1 })
+    session.append('llm/retry', {
+      turn: 1, step: 2, retry: 1, delayMs: 500, mode: 'normal', maxRetries: 5,
+      provider: 'private-provider', policyKey: 'private-policy', retryId: 'private-id',
+      failure: { code: 'RATE_LIMIT', message: 'private provider response' },
+    } as never)
+
+    const agent = { id: session.id, session, ctx } as never
+    const report = await ctx.commands.execute(agent, '/postmortem', [], new AbortController().signal)
+    const exported = await ctx.commands.execute(agent, '/postmortem-export', [], new AbortController().signal)
+    const repair = await ctx.commands.execute(agent, '/postmortem-repair', [], new AbortController().signal)
+
+    expect(report?.result.text).toContain('Model request retry 1 is scheduled')
+    expect(exported?.result.text).toContain('"modelState": "disabled"')
+    expect(exported?.result.text).not.toContain('private')
+    expect(repair?.result).toMatchObject({ kind: 'error' })
+  })
 })

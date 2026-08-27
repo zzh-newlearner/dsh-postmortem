@@ -66,7 +66,7 @@ async function reportFor(
   const trace = turnFromEvents(session.id, turn, recordedEvents(session))
   const cached = store.get(session.id, turn, trace.sourceSeq)
   if (cached !== undefined) return store.getPending(session.id, turn, trace.sourceSeq) ?? cached
-  const enabled = model?.enabled === true && llm !== undefined
+  const enabled = model?.enabled === true && llm !== undefined && trace.pendingModelRetry === undefined
   let report = diagnose(trace, enabled ? 'pending' : 'disabled')
   const withRepairPrompt = (value: PostmortemReport): PostmortemReport => {
     const repairPrompt = buildRepairPrompt(value)

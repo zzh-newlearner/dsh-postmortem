@@ -6,6 +6,7 @@ import type { PostmortemReport } from './types.js'
  */
 export function buildRepairPrompt(report: PostmortemReport): string | undefined {
   if (report.decision !== 'detected') return undefined
+  if (report.findings.every(finding => finding.code === 'model_retry')) return undefined
   const lines = [
     'Repair the previous agent attempt using only the evidence below.',
     'Do not repeat an unchanged failing tool call. Inspect preconditions before any retry.',

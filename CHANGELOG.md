@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.3
+
+- Adds immediate, redacted `/postmortem` status for an open DSH turn with a scheduled provider retry, without waiting for terminal failure or invoking the optional review model.
+
 ## 0.6.2
 
 - Publishes the plugin as a DSH bundle with its own Loader patch, so `dsh plugin --profile <name> add @huichangzz/dsh-postmortem` installs and registers it in one step.
