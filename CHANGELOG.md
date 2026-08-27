@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+- Publishes the plugin as a DSH bundle with its own Loader patch, so `dsh plugin --profile <name> add @huichangzz/dsh-postmortem` installs and registers it in one step.
+- Corrects the install guide: profile patches override the bundled defaults only when optional model review is enabled.
+
 ## 0.6.1
 
 - Adds a runnable DSH command-path self-check that exercises the built package through `Context`, `SessionStore`, `CommandRuntime`, and `LlmRuntime`.

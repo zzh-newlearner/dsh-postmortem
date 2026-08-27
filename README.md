@@ -31,20 +31,22 @@ The output contains no user messages, tool arguments, tool output, files, prompt
 ## Install In 60 Seconds / 60 秒安装
 
 ```sh
-npm install @huichangzz/dsh-postmortem
+dsh plugin --profile <profile-name> add @huichangzz/dsh-postmortem
 ```
 
-Add this to your DSH profile's `cordis.patch.yml`:
+This installs the package into the selected DSH profile and registers its bundle layer automatically. Restart that profile, then run `/postmortem` after a failed turn. No manual Loader entry is needed.
 
-将下面内容加入 DSH profile 的 `cordis.patch.yml`：
+这会将包安装到选定的 DSH profile，并自动注册它的 bundle 层。重启该 profile 后，在失败 turn 后执行 `/postmortem`。无需手动添加 Loader 条目。
+
+To enable the optional model review, add this override to that profile's `cordis.patch.yml`:
+
+若要启用可选的模型复盘，将下列覆盖项加入该 profile 的 `cordis.patch.yml`：
 
 ```yaml
 - id: postmortem
-  name: '@huichangzz/dsh-postmortem'
   config:
-    autoOnFailure: true
     model:
-      enabled: false
+      enabled: true
       provider: your-provider
       model: your-model
       timeoutMs: 10000

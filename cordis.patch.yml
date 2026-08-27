@@ -1,0 +1,7 @@
+# DSH bundle layer. The plugin stays fully deterministic by default; users
+# may override this row from their profile's cordis.patch.yml to enable model review.
+- insert:
+    - id: postmortem
+      name: '@huichangzz/dsh-postmortem'
+      config:
+        autoOnFailure: true
