@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+
+- Reframes the bilingual README around a 60-second install path, real redacted command output, and explicit recovery value.
+- Adds a runnable redacted demo, npm discovery metadata, and a privacy-safe issue template for external feedback.
+
 ## 0.5.0
 
 - Adds cancellation-aware diagnosis, one-way normalized tool-argument fingerprints, bounded model timeouts, and trace-level model-review coalescing.

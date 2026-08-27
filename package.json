@@ -1,7 +1,7 @@
 {
   "name": "@huichangzz/dsh-postmortem",
-  "version": "0.5.0",
-  "description": "Local-first failure postmortems for DeepSeek Harness sessions.",
+  "version": "0.6.0",
+  "description": "Explain failed DeepSeek Harness agent runs locally, then produce a redacted recovery plan. No model required.",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
@@ -17,10 +17,11 @@
     "type": "git",
     "url": "git+https://github.com/zzh-newlearner/dsh-postmortem.git"
   },
+  "homepage": "https://github.com/zzh-newlearner/dsh-postmortem#readme",
   "bugs": {
     "url": "https://github.com/zzh-newlearner/dsh-postmortem/issues"
   },
-  "keywords": ["dsh-plugin", "deepseek-harness", "agent-debugging", "postmortem"],
+  "keywords": ["deepseek", "deepseek-harness", "dsh", "dsh-plugin", "agent-debugging", "agent-observability", "llm-agents", "incident-response", "postmortem", "typescript"],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
@@ -45,6 +46,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "pack:check": "npm pack --dry-run",
+    "demo": "node scripts/demo.mjs",
     "eval:models": "node scripts/model-eval.mjs"
   }
 }

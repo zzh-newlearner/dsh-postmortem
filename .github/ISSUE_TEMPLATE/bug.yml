@@ -1,0 +1,42 @@
+name: DSH postmortem issue
+description: Report an incorrect diagnosis, compatibility problem, or unclear recovery suggestion.
+title: "[Issue]: "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include user content, tool arguments, tool output, prompts, credentials, or raw session traces."
+  - type: input
+    id: versions
+    attributes:
+      label: DSH and plugin versions
+      placeholder: "DSH 0.1.1-rc.2, dsh-postmortem 0.6.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Incorrect finding
+        - Missing finding
+        - Recovery suggestion
+        - Command or configuration
+        - Compatibility
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Redacted postmortem report
+      description: "Paste /postmortem-export output only after confirming that it contains no private data."
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
