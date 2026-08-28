@@ -29,6 +29,53 @@ describe('diagnose', () => {
     expect(report.findings.some(item => item.code === 'retry_loop')).toBe(true)
   })
 
+  it('does not turn three distinct structured calls into a retry loop', () => {
+    const report = diagnose({ sessionId: 's1', turn: 1, sourceSeq: 8, ended: true, endReason: 'error', toolCalls: [
+      { callId: '1', name: 'shell', step: 1, argumentFingerprint: argumentFingerprint({ cmd: 'ls' }), isError: true, resultPresent: true },
+      { callId: '2', name: 'shell', step: 2, argumentFingerprint: argumentFingerprint({ cmd: 'rm' }), isError: true, resultPresent: true },
+      { callId: '3', name: 'shell', step: 3, argumentFingerprint: argumentFingerprint({ cmd: 'cp' }), isError: true, resultPresent: true },
+    ] })
+    expect(report.findings.some(item => item.code === 'retry_loop')).toBe(false)
+  })
+
+  it('does not group missing fingerprints as unchanged calls', () => {
+    const report = diagnose({ sessionId: 's1', turn: 1, sourceSeq: 8, ended: true, endReason: 'error', toolCalls: [
+      { callId: '1', name: 'shell', step: 1, isError: true, resultPresent: true },
+      { callId: '2', name: 'shell', step: 2, isError: true, resultPresent: true },
+      { callId: '3', name: 'shell', step: 3, isError: true, resultPresent: true },
+    ] })
+    expect(report.findings.some(item => item.code === 'retry_loop')).toBe(false)
+  })
+
+  it('reports compatibility mismatch instead of a silent inconclusive result', () => {
+    const report = diagnose({
+      sessionId: 's1', turn: 1, sourceSeq: 4, ended: false, toolCalls: [],
+      recognizedEventCount: 0, unknownTurnEventCount: 4, malformedEventCount: 0,
+    })
+    expect(report).toMatchObject({ decision: 'detected', findings: [expect.objectContaining({ code: 'compat_mismatch' })] })
+    expect(formatReport(report)).toContain('incompatible')
+  })
+
+  it('distinguishes an open turn from a turn with no events', () => {
+    const open = diagnose({ sessionId: 's1', turn: 1, sourceSeq: 1, ended: false, recognizedEventCount: 1, toolCalls: [] })
+    const empty = diagnose({ sessionId: 's1', turn: 2, sourceSeq: 0, ended: false, recognizedEventCount: 0, toolCalls: [] })
+    expect(open.inconclusiveReason).toBe('open_turn')
+    expect(empty.inconclusiveReason).toBe('no_turn_events')
+    expect(formatReport(empty)).toContain('no recognized session events')
+  })
+
+  it('discloses truncated findings and the next command', () => {
+    const report = diagnose({ sessionId: 's1', turn: 1, sourceSeq: 8, ended: true, endReason: 'error', toolCalls: [
+      { callId: '1', name: 'a', step: 1, isError: true, resultPresent: true },
+      { callId: '2', name: 'b', step: 2, isError: true, resultPresent: true },
+      { callId: '3', name: 'c', step: 3, isError: true, resultPresent: true },
+      { callId: '4', name: 'd', step: 4, isError: true, resultPresent: true },
+    ] })
+    const text = formatReport(report)
+    expect(text).toContain('more finding(s) omitted')
+    expect(text).toContain('Next: /postmortem-repair 1')
+  })
+
   it('does not recommend repair for an explicit user cancellation', () => {
     const report = diagnose({
       sessionId: 's1', turn: 1, sourceSeq: 3, ended: true, endReason: 'aborted', endAbortCause: 'user',

@@ -23,12 +23,17 @@ describe('real DSH composition', () => {
       error: { name: 'ToolError', code: 'ENOENT' },
     }, { surfaceOp: 'append' })
     session.append('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'tool failed', code: 'UNKNOWN' } } })
+    session.append('turn/start', { turn: 2 })
+    session.append('turn/end', { turn: 2, reason: { kind: 'error', error: { message: 'private failure', code: 'RATE_LIMIT' } } })
 
     const agent = { id: session.id, session, ctx } as never
-    const report = await ctx.commands.execute(agent, '/postmortem', [], new AbortController().signal)
+    const report = await ctx.commands.execute(agent, '/postmortem 1', [], new AbortController().signal)
     const exported = await ctx.commands.execute(agent, '/postmortem-export 1', [], new AbortController().signal)
     const plan = await ctx.commands.execute(agent, '/postmortem-plan 1', [], new AbortController().signal)
     const repair = await ctx.commands.execute(agent, '/postmortem-repair 1', [], new AbortController().signal)
+    const range = await ctx.commands.execute(agent, '/postmortem 1-2', [], new AbortController().signal)
+    const lastFailed = await ctx.commands.execute(agent, '/postmortem --last-failed', [], new AbortController().signal)
+    const feedback = await ctx.commands.execute(agent, '/postmortem-feedback 1', [], new AbortController().signal)
 
     expect(report?.result).toMatchObject({ kind: 'success' })
     expect(report?.result.text).toContain('Tool shell failed')
@@ -40,6 +45,12 @@ describe('real DSH composition', () => {
     expect(plan?.result.text).not.toContain('does-not-exist')
     expect(plan?.result.text).not.toContain('private output')
     expect(repair?.result.text).toContain('Do not repeat an unchanged failing tool call')
+    expect(repair?.result.text).toContain('fresh agent attempt')
+    expect(range?.result.text).toContain('2 selected turns')
+    expect(lastFailed?.result.text).toContain('turn 2')
+    expect(feedback?.result.text).toContain('@huichangzz/dsh-postmortem 0.9.0')
+    expect(feedback?.result.text).toContain('issues/new/choose')
+    expect(feedback?.result.text).not.toContain('private output')
     expect(session.events.map(event => event.type)).not.toContain('agent/inject')
   })
 

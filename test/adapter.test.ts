@@ -38,6 +38,26 @@ describe('turnFromEvents', () => {
     expect(trace.endAbortCause).toBe('user')
   })
 
+  it('hashes structured arguments without retaining them', () => {
+    const trace = turnFromEvents('session-1', 6, [
+      { type: 'tool/call', data: { turn: 6, step: 1, callId: 'first', name: 'shell', arguments: { b: 2, a: 1 } } },
+      { type: 'tool/call', data: { turn: 6, step: 2, callId: 'second', name: 'shell', arguments: { a: 1, b: 2 } } },
+      { type: 'tool/call', data: { turn: 6, step: 3, callId: 'third', name: 'shell', arguments: { a: 2 } } },
+    ])
+    expect(trace.toolCalls[0]?.argumentFingerprint).toBe(trace.toolCalls[1]?.argumentFingerprint)
+    expect(trace.toolCalls[0]?.argumentFingerprint).not.toBe(trace.toolCalls[2]?.argumentFingerprint)
+    expect(JSON.stringify(trace)).not.toContain('"a"')
+  })
+
+  it('keeps compatibility telemetry without retaining unknown event names', () => {
+    const trace = turnFromEvents('session-1', 7, [
+      { type: 'turn_start_v2', data: { turn: 7 } },
+      { type: 'tool_call_v2', data: { turn: 7, step: 1 } },
+    ])
+    expect(trace).toMatchObject({ recognizedEventCount: 0, unknownTurnEventCount: 2, malformedEventCount: 0 })
+    expect(JSON.stringify(trace)).not.toContain('tool_call_v2')
+  })
+
   it('projects a scheduled model retry without retaining its provider or failure message', () => {
     const trace = turnFromEvents('session-1', 5, [
       { type: 'llm/retry', seq: 9, data: {

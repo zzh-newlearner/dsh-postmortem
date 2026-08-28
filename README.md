@@ -56,9 +56,9 @@ To enable the optional model review, add this override to that profile's `cordis
       timeoutMs: 10000
 ```
 
-`autoOnFailure` prints a redacted report when a turn ends unsuccessfully. No key is configured or stored by this package. The optional model layer reuses DSH's configured `llm` service; the deterministic report remains available if that model is slow, unavailable, or invalid.
+`autoOnFailure` defaults to `detected`: it prints only actionable detected failures, not ordinary completion or user cancellation. Set it to `false` during noisy development, or `all` to retain legacy logging of every non-completed turn. No key is configured or stored by this package. The optional model layer reuses DSH's configured `llm` service; the deterministic report remains available if that model is slow, unavailable, or invalid.
 
-`autoOnFailure` 会在失败轮次结束时打印脱敏报告。本包不配置也不存储任何密钥。可选模型层复用 DSH 已配置的 `llm` 服务；即使模型缓慢、不可用或返回无效内容，确定性报告仍然可用。
+`autoOnFailure` 默认值为 `detected`：只打印可行动的已检测故障，不打印普通完成或用户取消。噪声较多的开发场景可设为 `false`；设为 `all` 可保留旧版对每个未完成轮次的日志。本包不配置也不存储任何密钥。可选模型层复用 DSH 已配置的 `llm` 服务；即使模型缓慢、不可用或返回无效内容，确定性报告仍然可用。
 
 ## What You Get / 你会得到什么
 
@@ -73,14 +73,15 @@ To enable the optional model review, add this override to that profile's `cordis
 
 | Command / 命令 | Use / 用途 |
 | --- | --- |
-| `/postmortem [turn]` | Read a concise local report for the latest or selected turn, including a scheduled model retry before a turn ends. / 查看最近或指定轮次的本地报告；在轮次结束前也会显示已调度的模型重试。 |
-| `/postmortem-plan [turn]` | Export schema-v1 copy-only repair actions with verification steps for a detected failure. / 导出带验证步骤的 schema-v1 仅复制修复动作。 |
-| `/postmortem-repair [turn]` | Copy a bounded recovery prompt for a detected failure. / 复制针对已检测故障的受限恢复提示。 |
-| `/postmortem-export [turn]` | Export a redacted schema-v2 report for issue filing or evaluation. / 导出脱敏 schema-v2 报告，用于提交 issue 或评测。 |
+| `/postmortem [turn\|from-to\|--last-failed]` | Read the latest, selected, range, or most recent failed turn. The first line distinguishes an open live status from an ended turn. / 查看最新、指定、范围或最近失败轮次；首行会区分开放轮次的实时状态与已结束轮次。 |
+| `/postmortem-plan [turn\|from-to\|--last-failed]` | Export schema-v1 copy-only repair actions with verification steps. / 导出带验证步骤的 schema-v1 仅复制修复动作。 |
+| `/postmortem-repair [turn\|from-to\|--last-failed]` | Copy a bounded recovery prompt for a fresh agent attempt, never a session that is still running. / 复制用于新 agent 尝试的受限恢复提示，不能粘贴进仍在运行的 session。 |
+| `/postmortem-export [turn\|from-to\|--last-failed]` | Export a redacted schema-v2 report, or a range envelope, for issue filing or evaluation. / 导出脱敏 schema-v2 报告或范围封装，用于提交 issue 或评测。 |
+| `/postmortem-feedback [turn\|from-to\|--last-failed]` | Render a redacted issue template with plugin version and report. It does not upload or copy data. / 生成含插件版本与报告的脱敏 issue 模板；不会上传或复制数据。 |
 
-Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. The repair commands only return text or JSON. They never retry a tool, change the agent loop, inject a follow-up, or become model context.
+Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. Text reports show at most four findings and explicitly link to full export when truncated; structured plans retain all findings. The repair and feedback commands only return text or JSON. They never retry a tool, change the agent loop, inject a follow-up, copy data, or become model context.
 
-命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。修复命令只返回文本或 JSON，不会重试工具、改变 agent loop、注入 follow-up 或进入模型上下文。
+命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。文本报告最多显示四条 finding，截断时会明确提示完整导出；结构化计划保留全部 finding。修复与反馈命令只返回文本或 JSON，不会重试工具、改变 agent loop、注入 follow-up、复制数据或进入模型上下文。
 
 When DSH has scheduled a provider retry, `/postmortem` returns immediate local status instead of waiting for a terminal turn. It retains only retry count, step, delay, mode, finite retry budget, and error code; provider details and failure messages are discarded. This live status never invokes the optional review model or emits a repair prompt.
 
@@ -155,9 +156,9 @@ npm run eval:verified
 npm pack --dry-run
 ```
 
-`npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the four user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
+`npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the five user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
 
-`npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证四个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
+`npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证五个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
 
 ## License / 许可证
 

@@ -35,11 +35,16 @@ export interface TurnTrace {
   sourceSeq: number
   toolCalls: ToolCall[]
   pendingModelRetry?: PendingModelRetry
+  /** Compatibility telemetry only; no event names or payloads are retained. */
+  recognizedEventCount?: number
+  unknownTurnEventCount?: number
+  malformedEventCount?: number
 }
 
-export type FindingCode = 'tool_error' | 'retry_loop' | 'missing_result' | 'turn_failed' | 'model_retry'
+export type FindingCode = 'tool_error' | 'retry_loop' | 'missing_result' | 'turn_failed' | 'model_retry' | 'compat_mismatch'
 export type Actionability = 'actionable' | 'partly_actionable' | 'not_actionable' | 'insufficient_evidence'
 export type PostmortemDecision = 'detected' | 'clean' | 'cancelled' | 'inconclusive'
+export type InconclusiveReason = 'open_turn' | 'no_turn_events'
 
 export interface Finding {
   code: FindingCode
@@ -72,6 +77,7 @@ export type RepairActionKind =
   | 'wait_for_rate_limit'
   | 'reduce_context'
   | 'review_prior_findings'
+  | 'check_compatibility'
 
 export interface RepairAction {
   id: string
@@ -102,6 +108,7 @@ export interface PostmortemReport {
   /** Last session event included while producing this report. */
   sourceSeq: number
   decision: PostmortemDecision
+  inconclusiveReason?: InconclusiveReason
   findings: Finding[]
   modelState: ModelState
   modelReview?: ModelReview

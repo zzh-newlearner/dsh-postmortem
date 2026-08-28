@@ -4,4 +4,4 @@
     - id: postmortem
       name: '@huichangzz/dsh-postmortem'
       config:
-        autoOnFailure: true
+        autoOnFailure: detected

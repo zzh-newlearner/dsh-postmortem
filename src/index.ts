@@ -30,10 +30,11 @@ export type * from './types.js'
 
 export const name = 'dsh-postmortem'
 export const inject = ['commands', 'sessions', 'llm']
+const PACKAGE_VERSION = '0.9.0'
 
 export interface Config {
-  /** Cache a report when a turn ends unsuccessfully. Defaults to true. */
-  autoOnFailure?: boolean
+  /** false disables logs; detected is the quiet default; all retains legacy behavior. */
+  autoOnFailure?: boolean | 'detected' | 'all'
   model?: ModelConfig & { enabled?: boolean }
 }
 
@@ -52,10 +53,37 @@ function latestTurn(session: Session): number | undefined {
   return undefined
 }
 
-function turnArgument(rawInput: string, session: Session): number | undefined {
+interface TurnSelection {
+  turns: number[]
+  range: boolean
+}
+
+function lastFailedTurn(session: Session): number | undefined {
+  for (const event of [...session.events].reverse()) {
+    if (event.type !== 'turn/end') continue
+    const data = event.data as unknown as { turn?: unknown, reason?: { kind?: unknown } }
+    if (typeof data.turn === 'number' && data.reason?.kind !== 'completed') return data.turn
+  }
+  return undefined
+}
+
+function turnSelection(rawInput: string, session: Session): TurnSelection | undefined {
   const input = rawInput.trim()
-  if (input.length === 0) return latestTurn(session)
-  return /^\d+$/.test(input) ? Number(input) : undefined
+  if (input.length === 0) {
+    const turn = latestTurn(session)
+    return turn === undefined ? undefined : { turns: [turn], range: false }
+  }
+  if (input === '--last-failed') {
+    const turn = lastFailedTurn(session)
+    return turn === undefined ? undefined : { turns: [turn], range: false }
+  }
+  if (/^\d+$/.test(input)) return { turns: [Number(input)], range: false }
+  const match = /^(\d+)-(\d+)$/.exec(input)
+  if (match === null) return undefined
+  const start = Number(match[1])
+  const end = Number(match[2])
+  if (end < start || end - start > 99) return undefined
+  return { turns: Array.from({ length: end - start + 1 }, (_, index) => start + index), range: true }
 }
 
 async function reportFor(
@@ -87,6 +115,42 @@ async function reportFor(
   })
 }
 
+async function reportsFor(
+  session: Session,
+  selection: TurnSelection,
+  store: PostmortemStore,
+  model: Config['model'] | undefined,
+  llm: LlmRuntime | undefined,
+  signal?: AbortSignal,
+): Promise<PostmortemReport[]> {
+  return Promise.all(selection.turns.map(turn => reportFor(session, turn, store, model, llm, signal)))
+}
+
+function formatReports(reports: readonly PostmortemReport[]): string {
+  if (reports.length === 1) return formatReport(reports[0] as PostmortemReport)
+  return `Postmortem: ${reports.length} selected turns.\n\n${reports.map(report => `--- Turn ${report.turn} ---\n${formatReport(report)}`).join('\n\n')}`
+}
+
+function feedbackTemplate(reports: readonly PostmortemReport[]): string {
+  return [
+    '# DSH Postmortem feedback',
+    '',
+    `Plugin: @huichangzz/dsh-postmortem ${PACKAGE_VERSION}`,
+    'Please remove any secrets or private context before submitting. The report below is redacted by the plugin.',
+    '',
+    '## What happened',
+    '',
+    '## What you expected',
+    '',
+    '## Redacted report',
+    '```json',
+    JSON.stringify(reports.length === 1 ? reports[0] : { schemaVersion: '1', reports }, null, 2),
+    '```',
+    '',
+    'Open: https://github.com/zzh-newlearner/dsh-postmortem/issues/new/choose',
+  ].join('\n')
+}
+
 export function apply(ctx: Context, config: Config = {}): void {
   const store = new PostmortemStore()
   const logger = ctx.logger('dsh-postmortem')
@@ -95,57 +159,73 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.commands.register({
     name: 'postmortem-plan',
     description: 'Export a copy-only, machine-readable repair plan for a failed turn.',
-    input: { hint: '[turn]' },
+    input: { hint: '[turn|from-to|--last-failed]' },
     recordInput: false,
     async handler({ agent, rawInput, signal }) {
-      const turn = turnArgument(rawInput, agent.session)
-      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-plan [turn]' }
-      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
-      const plan = buildRepairPlan(report)
-      return plan === undefined
-        ? { kind: 'error', text: 'No actionable repair plan is available for this turn.' }
-        : { kind: 'success', text: JSON.stringify(plan, null, 2) }
+      const selection = turnSelection(rawInput, agent.session)
+      if (selection === undefined) return { kind: 'error', text: 'Usage: /postmortem-plan [turn|from-to|--last-failed]' }
+      const reports = await reportsFor(agent.session, selection, store, config.model, llm, signal)
+      const plans = reports.map(report => ({ turn: report.turn, plan: buildRepairPlan(report) }))
+      if (plans.every(value => value.plan === undefined)) {
+        return { kind: 'error', text: 'No actionable repair plan is available for the selected turn(s).' }
+      }
+      return selection.range
+        ? { kind: 'success', text: JSON.stringify({ schemaVersion: '1', plans }, null, 2) }
+        : { kind: 'success', text: JSON.stringify(plans[0]?.plan, null, 2) }
     },
   })
 
   ctx.commands.register({
     name: 'postmortem',
     description: 'Show a local, redacted postmortem for the latest or selected turn.',
-    input: { hint: '[turn]' },
+    input: { hint: '[turn|from-to|--last-failed]' },
     recordInput: false,
     async handler({ agent, rawInput, signal }) {
-      const turn = turnArgument(rawInput, agent.session)
-      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem [turn]' }
-      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
-      return { kind: 'success', text: formatReport(report) }
+      const selection = turnSelection(rawInput, agent.session)
+      if (selection === undefined) return { kind: 'error', text: 'Usage: /postmortem [turn|from-to|--last-failed]' }
+      const reports = await reportsFor(agent.session, selection, store, config.model, llm, signal)
+      return { kind: 'success', text: formatReports(reports) }
     },
   })
 
   ctx.commands.register({
     name: 'postmortem-export',
     description: 'Export the redacted structured postmortem for a turn.',
-    input: { hint: '[turn]' },
+    input: { hint: '[turn|from-to|--last-failed]' },
     recordInput: false,
     async handler({ agent, rawInput, signal }) {
-      const turn = turnArgument(rawInput, agent.session)
-      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-export [turn]' }
-      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
-      return { kind: 'success', text: JSON.stringify(report, null, 2) }
+      const selection = turnSelection(rawInput, agent.session)
+      if (selection === undefined) return { kind: 'error', text: 'Usage: /postmortem-export [turn|from-to|--last-failed]' }
+      const reports = await reportsFor(agent.session, selection, store, config.model, llm, signal)
+      return { kind: 'success', text: JSON.stringify(selection.range ? { schemaVersion: '1', reports } : reports[0], null, 2) }
     },
   })
 
   ctx.commands.register({
     name: 'postmortem-repair',
     description: 'Render a copy-only repair prompt for a failed turn.',
-    input: { hint: '[turn]' },
+    input: { hint: '[turn|from-to|--last-failed]' },
     recordInput: false,
     async handler({ agent, rawInput, signal }) {
-      const turn = turnArgument(rawInput, agent.session)
-      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-repair [turn]' }
-      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
-      return report.repairPrompt === undefined
-        ? { kind: 'error', text: 'No failed turn is available to repair.' }
-        : { kind: 'success', text: report.repairPrompt }
+      const selection = turnSelection(rawInput, agent.session)
+      if (selection === undefined) return { kind: 'error', text: 'Usage: /postmortem-repair [turn|from-to|--last-failed]' }
+      const reports = await reportsFor(agent.session, selection, store, config.model, llm, signal)
+      const prompts = reports.flatMap(report => report.repairPrompt === undefined ? [] : [{ turn: report.turn, prompt: report.repairPrompt }])
+      if (prompts.length === 0) return { kind: 'error', text: 'No failed turn is available to repair.' }
+      return { kind: 'success', text: prompts.length === 1 ? prompts[0]?.prompt ?? '' : prompts.map(value => `--- Turn ${value.turn} ---\n${value.prompt}`).join('\n\n') }
+    },
+  })
+
+  ctx.commands.register({
+    name: 'postmortem-feedback',
+    description: 'Render a redacted feedback template for a selected turn or range.',
+    input: { hint: '[turn|from-to|--last-failed]' },
+    recordInput: false,
+    async handler({ agent, rawInput, signal }) {
+      const selection = turnSelection(rawInput, agent.session)
+      if (selection === undefined) return { kind: 'error', text: 'Usage: /postmortem-feedback [turn|from-to|--last-failed]' }
+      const reports = await reportsFor(agent.session, selection, store, config.model, llm, signal)
+      return { kind: 'success', text: feedbackTemplate(reports) }
     },
   })
 
@@ -153,7 +233,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     ctx.on('session/event', (session, event) => {
       if (event.type !== 'turn/end' || event.data.reason.kind === 'completed') return
       void reportFor(session, event.data.turn, store, config.model, llm)
-        .then(report => logger.warn(formatReport(report)))
+        .then(report => {
+          const mode = config.autoOnFailure ?? 'detected'
+          if (mode === true || mode === 'all' || report.decision === 'detected') logger.warn(formatReport(report))
+        })
     })
   }
 }

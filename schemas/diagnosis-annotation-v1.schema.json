@@ -9,7 +9,7 @@
     "schemaVersion": { "const": "1" },
     "recordId": { "type": "string", "minLength": 1 },
     "reviewerId": { "type": "string", "minLength": 1, "description": "Pseudonymous reviewer identifier; do not use a personal name or email." },
-    "primaryIssue": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "model_retry", "none", "other", "cancelled"] },
+    "primaryIssue": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "model_retry", "compat_mismatch", "none", "other", "cancelled"] },
     "evidenceSteps": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
     "actionability": { "enum": ["actionable", "partly_actionable", "not_actionable", "insufficient_evidence"] },
     "notes": { "type": "string", "maxLength": 500, "description": "Do not include secrets, user content, raw tool input, raw tool output, paths, or credentials." }

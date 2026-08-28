@@ -24,10 +24,18 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
   let endEventSeq: number | undefined
   let pendingModelRetry: PendingModelRetry | undefined
   let sourceSeq = 0
+  let recognizedEventCount = 0
+  let unknownTurnEventCount = 0
+  let malformedEventCount = 0
   for (const event of events) {
     const eventTurn = numberValue(event.data.turn)
     if (eventTurn !== turn) continue
     sourceSeq = Math.max(sourceSeq, event.seq ?? 0)
+    if (!['turn/start', 'tool/call', 'tool/result', 'turn/end', 'llm/retry', 'llm/retry-started'].includes(event.type)) {
+      unknownTurnEventCount += 1
+      continue
+    }
+    recognizedEventCount += 1
     if (event.type === 'tool/call') {
       const callId = stringValue(event.data.callId)
       const name = stringValue(event.data.name)
@@ -36,13 +44,13 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
         calls.set(callId, {
           callId,
           name,
-          argumentFingerprint: argumentFingerprint(stringValue(event.data.arguments)),
+          argumentFingerprint: argumentFingerprint(event.data.arguments),
           step,
           callEventSeq: event.seq,
           resultPresent: false,
           isError: false,
         })
-      }
+      } else malformedEventCount += 1
     }
     if (event.type === 'tool/result') {
       const message = objectValue(event.data.message)
@@ -62,14 +70,18 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
             errorCode: stringValue(error?.code),
           })
         }
-      }
+      } else malformedEventCount += 1
     }
     if (event.type === 'turn/end') {
       const reason = objectValue(event.data.reason)
-      endReason = stringValue(reason?.kind) ?? 'unknown'
-      endErrorCode = stringValue(objectValue(reason?.error)?.code)
-      endAbortCause = stringValue(objectValue(reason?.reason)?.kind)
-      endEventSeq = event.seq
+      const kind = stringValue(reason?.kind)
+      if (kind === undefined) malformedEventCount += 1
+      else {
+        endReason = kind
+        endErrorCode = stringValue(objectValue(reason?.error)?.code)
+        endAbortCause = stringValue(objectValue(reason?.reason)?.kind)
+        endEventSeq = event.seq
+      }
     }
     if (event.type === 'llm/retry') {
       const step = numberValue(event.data.step)
@@ -90,7 +102,7 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
           ...(errorCode === undefined ? {} : { errorCode }),
           ...(event.seq === undefined ? {} : { eventSeq: event.seq }),
         }
-      }
+      } else malformedEventCount += 1
     }
     if (event.type === 'llm/retry-started' && pendingModelRetry !== undefined) {
       const step = numberValue(event.data.step)
@@ -109,5 +121,8 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
     sourceSeq,
     toolCalls: [...calls.values()].sort((left, right) => left.step - right.step || left.callId.localeCompare(right.callId)),
     ...(endReason === undefined && pendingModelRetry !== undefined ? { pendingModelRetry } : {}),
+    recognizedEventCount,
+    unknownTurnEventCount,
+    malformedEventCount,
   }
 }

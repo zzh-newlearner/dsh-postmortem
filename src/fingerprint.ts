@@ -16,13 +16,15 @@ export function stableFingerprint(value: unknown): string {
  * Produce a one-way, stable key for retry detection. Raw tool arguments never
  * enter a TurnTrace, cache, report, or model prompt.
  */
-export function argumentFingerprint(argumentsText: string | undefined): string | undefined {
-  if (argumentsText === undefined) return undefined
-  let normalized = argumentsText
-  try {
-    normalized = canonicalJson(JSON.parse(argumentsText))
-  } catch {
-    // Invalid JSON is still comparable without exposing its original content.
+export function argumentFingerprint(argumentsValue: unknown): string | undefined {
+  if (argumentsValue === undefined) return undefined
+  let normalized = argumentsValue
+  if (typeof argumentsValue === 'string') {
+    try {
+      normalized = JSON.parse(argumentsValue)
+    } catch {
+      // Invalid JSON is still comparable without exposing its original content.
+    }
   }
   return stableFingerprint(normalized)
 }

@@ -16,9 +16,9 @@
         "required": ["id", "findingCode", "step", "kind", "execution", "action", "verification"],
         "properties": {
           "id": { "type": "string" },
-          "findingCode": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "model_retry"] },
+          "findingCode": { "enum": ["tool_error", "retry_loop", "missing_result", "turn_failed", "model_retry", "compat_mismatch"] },
           "step": { "type": "integer", "minimum": 0 },
-          "kind": { "enum": ["check_resource", "check_permission", "check_external_state", "inspect_tool_arguments", "stop_unchanged_retry", "correct_credential", "wait_for_rate_limit", "reduce_context", "review_prior_findings"] },
+          "kind": { "enum": ["check_resource", "check_permission", "check_external_state", "inspect_tool_arguments", "stop_unchanged_retry", "correct_credential", "wait_for_rate_limit", "reduce_context", "review_prior_findings", "check_compatibility"] },
           "execution": { "const": "copy_only" },
           "action": { "type": "string" },
           "verification": { "type": "string" }

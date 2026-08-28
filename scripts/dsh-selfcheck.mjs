@@ -33,7 +33,8 @@ const report = requiredText(await ctx.commands.execute(agent, '/postmortem', [],
 const exported = requiredText(await ctx.commands.execute(agent, '/postmortem-export 1', [], signal), 'postmortem-export')
 const plan = requiredText(await ctx.commands.execute(agent, '/postmortem-plan 1', [], signal), 'postmortem-plan')
 const repair = requiredText(await ctx.commands.execute(agent, '/postmortem-repair 1', [], signal), 'postmortem-repair')
-const combined = `${report}\n${exported}\n${plan}\n${repair}`
+const feedback = requiredText(await ctx.commands.execute(agent, '/postmortem-feedback 1', [], signal), 'postmortem-feedback')
+const combined = `${report}\n${exported}\n${plan}\n${repair}\n${feedback}`
 
 if (!report.includes('Tool shell failed') || !repair.includes('Do not repeat an unchanged failing tool call')) {
   throw new Error('expected diagnostic or recovery guidance is missing')
@@ -41,10 +42,13 @@ if (!report.includes('Tool shell failed') || !repair.includes('Do not repeat an 
 if (!plan.includes('"execution": "copy_only"') || !plan.includes('"verification"')) {
   throw new Error('repair plan did not preserve its copy-only and verification boundaries')
 }
+if (!feedback.includes('issues/new/choose') || !repair.includes('fresh agent attempt')) {
+  throw new Error('feedback or fresh-attempt guidance is missing')
+}
 if (combined.includes('private-command') || combined.includes('private tool output') || combined.includes('private terminal message')) {
   throw new Error('private trace data escaped the postmortem boundary')
 }
 if (session.events.some(event => event.type === 'agent/inject')) throw new Error('self-check unexpectedly injected agent context')
 
 console.log(report)
-console.log('\nDSH command-path self-check passed: report, export, plan, repair, redaction, and no injection.')
+console.log('\nDSH command-path self-check passed: report, export, plan, repair, feedback, redaction, and no injection.')

@@ -32,7 +32,7 @@ function toolRecommendation(code: string | undefined): string {
     case 'ENOENT':
       return 'Check that the requested executable or resource exists before retrying this action.'
     default:
-      return 'Inspect the tool arguments and error code before retrying this action.'
+      return 'Check the tool documentation and error code, then retry only with a changed input or precondition.'
   }
 }
 
@@ -54,6 +54,21 @@ function terminalRecommendation(reason: string, code: string | undefined): strin
 export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'): PostmortemReport {
   const findings: Finding[] = []
   const cancelled = userCancelled(trace)
+  const incompatible = ((trace.unknownTurnEventCount ?? 0) > 0 && (trace.recognizedEventCount ?? 0) === 0)
+    || (trace.malformedEventCount ?? 0) > 0
+  if (incompatible) {
+    findings.push({
+      code: 'compat_mismatch', severity: 'error', step: 1,
+      title: 'Session event format is incompatible with this plugin version',
+      eventSeqs: [],
+      evidence: [
+        `recognized_turn_events=${trace.recognizedEventCount ?? 0}`,
+        `unknown_turn_events=${trace.unknownTurnEventCount ?? 0}`,
+        `malformed_events=${trace.malformedEventCount ?? 0}`,
+      ],
+      recommendation: 'Verify the DSH and plugin compatibility versions before relying on this diagnosis.',
+    })
+  }
   if (!trace.ended && trace.pendingModelRetry !== undefined) {
     const retry = trace.pendingModelRetry
     const recommendation = retry.mode === 'always'
@@ -93,7 +108,8 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
 
   const runs = new Map<string, ToolCall[]>()
   for (const call of trace.toolCalls) {
-    const key = `${call.name}\u0000${call.argumentFingerprint ?? ''}`
+    if (call.argumentFingerprint === undefined) continue
+    const key = `${call.name}\u0000${call.argumentFingerprint}`
     const values = runs.get(key) ?? []
     values.push(call)
     runs.set(key, values)
@@ -125,6 +141,9 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
   return {
     schemaVersion: '2', sessionId: trace.sessionId, turn: trace.turn, sourceSeq: trace.sourceSeq,
     decision: findings.length > 0 ? 'detected' : cancelled ? 'cancelled' : trace.ended ? 'clean' : 'inconclusive',
+    ...(findings.length === 0 && !cancelled && !trace.ended
+      ? { inconclusiveReason: (trace.recognizedEventCount ?? 0) > 0 ? 'open_turn' as const : 'no_turn_events' as const }
+      : {}),
     findings,
     modelState: findings.length > 0 ? modelState : 'skipped_clean',
   }
@@ -133,11 +152,18 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
 export function formatReport(report: PostmortemReport): string {
   if (report.decision === 'clean') return `Postmortem: turn ${report.turn} has no recorded failures.`
   if (report.decision === 'cancelled') return `Postmortem: turn ${report.turn} was cancelled by the user; no repair is recommended.`
-  if (report.decision === 'inconclusive') return `Postmortem: turn ${report.turn} is still open or lacks enough recorded evidence.`
-  const lines = [`Postmortem: ${report.findings.length} finding(s) in turn ${report.turn}.`]
-  for (const finding of report.findings.slice(0, 4)) {
+  if (report.decision === 'inconclusive') {
+    return report.inconclusiveReason === 'no_turn_events'
+      ? `Postmortem: turn ${report.turn} has no recognized session events. Check the selected turn and DSH/plugin compatibility.`
+      : `Postmortem [open turn]: turn ${report.turn} is still running and has no terminal diagnosis yet.`
+  }
+  const lines = [`Postmortem${report.findings.some(finding => finding.code === 'model_retry') ? ' [open turn]' : ' [ended turn]'}: ${report.findings.length} finding(s) in turn ${report.turn}.`]
+  const visible = report.findings.slice(0, 4)
+  for (const finding of visible) {
     lines.push(`- [${finding.severity}] step ${finding.step}: ${finding.title}. ${finding.recommendation}`)
   }
+  const omitted = report.findings.length - visible.length
+  if (omitted > 0) lines.push(`... ${omitted} more finding(s) omitted; run /postmortem-export ${report.turn} for all findings.`)
   if (report.modelReview !== undefined) {
     lines.push(`Model review [${report.modelReview.confidence}]: ${report.modelReview.summary}`)
     lines.push(`Immediate action: ${report.modelReview.immediateAction}`)
@@ -146,5 +172,6 @@ export function formatReport(report: PostmortemReport): string {
   } else if (report.modelState === 'failed') {
     lines.push('Model review was unavailable; deterministic findings remain authoritative.')
   }
+  lines.push(`Next: /postmortem-repair ${report.turn} for a fresh-attempt prompt, /postmortem-plan ${report.turn} for JSON actions, or /postmortem-export ${report.turn} for the full report.`)
   return lines.join('\n')
 }

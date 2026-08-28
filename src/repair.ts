@@ -28,7 +28,7 @@ function actionFor(finding: Finding): ActionTemplate | undefined {
       }
       default: return {
         kind: 'inspect_tool_arguments',
-        action: 'Inspect the tool arguments and error code, then change the precondition or arguments before retrying.',
+        action: 'Check the tool documentation and error code, then change the input or precondition before retrying.',
         verification: 'Record the changed precondition or argument before one new call.',
       }
     }
@@ -37,6 +37,11 @@ function actionFor(finding: Finding): ActionTemplate | undefined {
     kind: 'stop_unchanged_retry',
     action: 'Stop repeating the unchanged failing call and choose a different recovery path.',
     verification: 'The next tool call must have a different precondition, arguments, or recovery strategy.',
+  }
+  if (finding.code === 'compat_mismatch') return {
+    kind: 'check_compatibility',
+    action: 'Verify the installed DSH and plugin versions before using this diagnosis to repair a task.',
+    verification: 'Confirm the session event format is supported, then re-run the diagnosis on a fresh failed turn.',
   }
   if (finding.code !== 'turn_failed') return undefined
   const code = finding.evidence.find(value => value.startsWith('turn_error_code='))?.slice('turn_error_code='.length)
@@ -106,6 +111,8 @@ export function buildRepairPrompt(report: PostmortemReport): string | undefined 
   if (report.decision !== 'detected') return undefined
   if (report.findings.every(finding => finding.code === 'model_retry')) return undefined
   const lines = [
+    'Use this as the first message of a fresh agent attempt. Do not paste it into a session that is still running.',
+    '',
     'Repair the previous agent attempt using only the evidence below.',
     'Do not repeat an unchanged failing tool call. Inspect preconditions before any retry.',
     'Do not expose secrets, raw user content, or raw tool output in the response.',

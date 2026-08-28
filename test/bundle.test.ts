@@ -12,6 +12,6 @@ describe('DSH bundle distribution', () => {
     expect(patch).toContain('- insert:')
     expect(patch).toContain("id: postmortem")
     expect(patch).toContain("name: '@huichangzz/dsh-postmortem'")
-    expect(patch).toContain('autoOnFailure: true')
+    expect(patch).toContain('autoOnFailure: detected')
   })
 })

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+- Fixes retry-loop false positives for structured or absent tool arguments; only calls with a matching one-way argument fingerprint are grouped.
+- Adds redacted compatibility diagnostics for unknown-only or malformed session event shapes instead of silently returning an inconclusive report.
+- Adds open/no-event inconclusive states, report next-step guidance, explicit truncation disclosure, fresh-attempt repair guidance, `--last-failed`, turn ranges, and `/postmortem-feedback`.
+- Changes bundled `autoOnFailure` to the quieter `detected` mode; `false` and legacy `all` remain available.
+
 ## 0.8.0
 
 - Adds a strict verified-pair evaluation contract that requires matching protocol, task, environment, and success-criterion fingerprints across arms.
