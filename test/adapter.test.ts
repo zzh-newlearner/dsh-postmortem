@@ -120,4 +120,44 @@ describe('turnFromEvents', () => {
     expect(report.findings.filter(finding => finding.code === 'retry_loop')).toHaveLength(1)
     expect(JSON.stringify(trace)).not.toContain('first description')
   })
+
+  it('pairs empty headless IDs by step and detects the reported changing-description retry loop', () => {
+    const events = [
+      { type: 'turn/start', seq: 1, data: { turn: 11 } },
+      ...Array.from({ length: 12 }, (_, index) => {
+        const step = index + 1
+        return [
+          { type: 'tool/call', seq: step * 10, data: {
+            turn: 11, step, callId: '', name: '',
+            arguments: JSON.stringify({ command: 'cat /nonexistent/seed.txt', description: `Retry wording ${step}` }),
+          } },
+          { type: 'tool/result', seq: step * 10 + 1, data: {
+            turn: 11, step, message: {
+              source: { kind: 'tool', callId: '' }, content: [{ type: 'tool-result', isError: true }],
+            }, error: { code: 'ENOENT' },
+          } },
+        ]
+      }).flat(),
+      { type: 'turn/end', seq: 200, data: { turn: 11, reason: { kind: 'error' } } },
+    ]
+    const trace = turnFromEvents('session-real-headless', 11, events)
+    expect(trace.toolCalls).toHaveLength(12)
+    expect(trace.toolCalls.every(call => call.callId === undefined && call.name === 'cat' && call.resultPresent && call.isError)).toBe(true)
+    expect(trace.malformedEventCount).toBe(0)
+    const report = diagnose(trace)
+    expect(report.findings.filter(finding => finding.code === 'tool_error')).toHaveLength(12)
+    expect(report.findings.filter(finding => finding.code === 'retry_loop')).toHaveLength(1)
+    expect(report.findings.find(finding => finding.code === 'retry_loop')?.title).toBe('Repeated failing call to cat')
+    expect(JSON.stringify(report)).not.toContain('seed.txt')
+    expect(JSON.stringify(report)).not.toContain('Retry wording')
+  })
+
+  it('uses an explicit unknown-tool placeholder when a command token is unsafe or absent', () => {
+    const trace = turnFromEvents('session-headless', 12, [
+      { type: 'tool/call', seq: 1, data: { turn: 12, step: 1, callId: '', name: '', arguments: '{"command":"$(private-secret)"}' } },
+      { type: 'tool/result', seq: 2, data: { turn: 12, step: 1, message: { source: { kind: 'tool', callId: '' }, content: [{ type: 'tool-result', isError: true }] } } },
+    ])
+    expect(trace.toolCalls[0]).toMatchObject({ name: 'unknown tool', resultPresent: true, isError: true })
+    expect(JSON.stringify(trace)).not.toContain('private-secret')
+  })
 })

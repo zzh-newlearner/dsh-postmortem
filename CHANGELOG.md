@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2
+
+- Pairs empty-ID headless `tool/result` events to distinct empty-ID `tool/call` observations by same-turn DSH step, including result-first ordering; empty IDs no longer block error evidence or retry-loop detection.
+- Derives a display label only from an allowlisted first token of `arguments.command` (for example `cat`); unsafe or absent metadata is rendered as `unknown tool`, never blank or retained verbatim.
+- Adds a DSH SessionStore/CommandRuntime integration regression and release self-check for the reported empty-ID, blank-name, changing-description retry trace.
+
 ## 0.9.1
 
 - Preserves each degraded headless `tool/call` with an empty ID as an independent observation instead of merging an entire turn into one call.

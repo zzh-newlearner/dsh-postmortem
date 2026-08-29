@@ -26,6 +26,8 @@ interface ToolMetadata {
   step?: number
 }
 
+const UNKNOWN_TOOL_NAME = 'unknown tool'
+
 function assistantMessageToolMetadata(event: RecordedEvent): Array<[string, ToolMetadata]> {
   const message = objectValue(event.data.message)
   const content = Array.isArray(message?.content) ? message?.content : event.data.content
@@ -47,17 +49,51 @@ function assistantMessageToolMetadata(event: RecordedEvent): Array<[string, Tool
 }
 
 function callKey(callId: string | undefined, event: RecordedEvent, index: number): string {
-  return callId === undefined ? `unkeyed:${event.seq ?? index}` : `id:${callId}`
+  return callId === undefined ? `unkeyed:${event.seq ?? 'none'}:${index}` : `id:${callId}`
 }
 
 function unknownCall(step: number): ToolCall {
   return { step, callPresent: false, resultPresent: false, isError: false }
 }
 
+function commandToolName(argumentsValue: unknown): string | undefined {
+  let parsed = argumentsValue
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed)
+    } catch {
+      return undefined
+    }
+  }
+  const argumentsObject = objectValue(parsed)
+  const command = stringValue(argumentsObject?.command)
+  if (command === undefined) return undefined
+  const token = command.trim().split(/\s+/, 1)[0]
+  if (token === undefined) return undefined
+  const basename = token.replace(/\\/g, '/').split('/').at(-1)
+  return basename !== undefined && /^[A-Za-z0-9][A-Za-z0-9._+-]{0,47}$/.test(basename)
+    ? basename
+    : undefined
+}
+
+function displayToolName(name: string | undefined, argumentsValue: unknown): string {
+  return name ?? commandToolName(argumentsValue) ?? UNKNOWN_TOOL_NAME
+}
+
+function dequeue(keysByStep: Map<number, string[]>, step: number): string | undefined {
+  if (step === 0) return undefined
+  const keys = keysByStep.get(step)
+  const key = keys?.shift()
+  if (keys?.length === 0) keysByStep.delete(step)
+  return key
+}
+
 /** Project only diagnosis metadata from a DSH event log. Tool payloads stay in the log. */
 export function turnFromEvents(sessionId: string, turn: number, events: readonly RecordedEvent[]): TurnTrace {
   const calls = new Map<string, ToolCall>()
   const assistantCalls = new Map<string, ToolMetadata>()
+  const pendingEmptyCallsByStep = new Map<number, string[]>()
+  const pendingEmptyResultsByStep = new Map<number, string[]>()
   // Session exports can be reordered by an external headless collector. Index
   // canonical assistant tool blocks first so call/result pairing stays stable.
   for (const event of events) {
@@ -85,16 +121,18 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
     if (event.type === 'tool/call') {
       const callId = nonEmptyStringValue(event.data.callId)
       const metadata = callId === undefined ? undefined : assistantCalls.get(callId)
-      const name = nonEmptyStringValue(event.data.name) ?? metadata?.name
+      const explicitName = nonEmptyStringValue(event.data.name) ?? metadata?.name
       const argumentsValue = event.data.arguments ?? metadata?.argumentsValue
       const step = numberValue(event.data.step) ?? metadata?.step ?? 0
-      if (callId === undefined || name === undefined || step === 0) malformedEventCount += 1
-      const key = callKey(callId, event, index)
+      if (step === 0) malformedEventCount += 1
+      const key = callId === undefined
+        ? dequeue(pendingEmptyResultsByStep, step) ?? callKey(callId, event, index)
+        : callKey(callId, event, index)
       const current = calls.get(key) ?? unknownCall(step)
       calls.set(key, {
         ...current,
         ...(callId === undefined ? {} : { callId }),
-        ...(name === undefined ? {} : { name }),
+        name: current.name ?? displayToolName(explicitName, argumentsValue),
         ...(argumentsValue === undefined ? {} : {
           argumentFingerprint: argumentFingerprint(argumentsValue),
           retryFingerprint: retryFingerprint(argumentsValue),
@@ -103,6 +141,11 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
         callPresent: true,
         ...(event.seq === undefined ? {} : { callEventSeq: event.seq }),
       })
+      if (callId === undefined && !current.resultPresent && step > 0) {
+        const values = pendingEmptyCallsByStep.get(step) ?? []
+        values.push(key)
+        pendingEmptyCallsByStep.set(step, values)
+      }
     }
     if (event.type === 'tool/result') {
       const message = objectValue(event.data.message)
@@ -112,14 +155,16 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
       const callId = nonEmptyStringValue(source?.callId) ?? nonEmptyStringValue(event.data.callId)
       const metadata = callId === undefined ? undefined : assistantCalls.get(callId)
       const step = numberValue(event.data.step) ?? metadata?.step ?? 0
-      if (callId === undefined) malformedEventCount += 1
-      const key = callKey(callId, event, index)
+      if (step === 0) malformedEventCount += 1
+      const key = callId === undefined
+        ? dequeue(pendingEmptyCallsByStep, step) ?? callKey(callId, event, index)
+        : callKey(callId, event, index)
       const current = calls.get(key) ?? unknownCall(step)
       const error = objectValue(event.data.error)
       calls.set(key, {
         ...current,
         ...(callId === undefined ? {} : { callId }),
-        ...(current.name === undefined && metadata?.name !== undefined ? { name: metadata.name } : {}),
+        ...(current.name === undefined ? { name: displayToolName(metadata?.name, metadata?.argumentsValue) } : {}),
         ...(current.argumentFingerprint === undefined && metadata?.argumentsValue !== undefined ? {
           argumentFingerprint: argumentFingerprint(metadata.argumentsValue),
           retryFingerprint: retryFingerprint(metadata.argumentsValue),
@@ -130,6 +175,11 @@ export function turnFromEvents(sessionId: string, turn: number, events: readonly
         isError: resultBlock?.isError === true || event.data.isError === true,
         ...(nonEmptyStringValue(error?.code) === undefined ? {} : { errorCode: nonEmptyStringValue(error?.code) }),
       })
+      if (callId === undefined && !current.callPresent && step > 0) {
+        const values = pendingEmptyResultsByStep.get(step) ?? []
+        values.push(key)
+        pendingEmptyResultsByStep.set(step, values)
+      }
     }
     if (event.type === 'turn/end') {
       const reason = objectValue(event.data.reason)

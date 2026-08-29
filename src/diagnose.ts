@@ -3,7 +3,7 @@ import type { Finding, ModelState, PostmortemReport, ToolCall, TurnTrace } from 
 const RETRY_THRESHOLD = 3
 
 function toolSummary(call: ToolCall): string {
-  return `tool=${call.name ?? 'unavailable'}, call=${call.callId ?? 'unavailable'}`
+  return `tool=${call.name ?? 'unknown tool'}, call=${call.callId ?? 'unavailable'}`
 }
 
 function eventSeqs(...values: Array<number | undefined>): number[] {
@@ -91,7 +91,7 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
     if (call.isError && !(cancelled && cancellationError(call.errorCode))) {
       findings.push({
         code: 'tool_error', severity: 'error', step: call.step,
-        title: `Tool ${call.name ?? 'metadata unavailable'} failed`, eventSeqs: eventSeqs(call.callEventSeq, call.resultEventSeq),
+        title: `Tool ${call.name ?? 'unknown tool'} failed`, eventSeqs: eventSeqs(call.callEventSeq, call.resultEventSeq),
         evidence: [toolSummary(call), ...(call.errorCode ? [`error_code=${call.errorCode}`] : [])],
         recommendation: toolRecommendation(call.errorCode),
       })
@@ -99,7 +99,7 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
     if (trace.ended && call.callPresent !== false && !call.resultPresent && !cancelled) {
       findings.push({
         code: 'missing_result', severity: 'warning', step: call.step,
-        title: `Tool ${call.name ?? 'metadata unavailable'} has no recorded result`, eventSeqs: eventSeqs(call.callEventSeq),
+        title: `Tool ${call.name ?? 'unknown tool'} has no recorded result`, eventSeqs: eventSeqs(call.callEventSeq),
         evidence: [toolSummary(call)],
         recommendation: 'Verify whether the tool timed out, was cancelled, or failed before it could return.',
       })
@@ -109,7 +109,7 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
   const runs = new Map<string, ToolCall[]>()
   for (const call of trace.toolCalls) {
     const retryKey = call.retryFingerprint ?? call.argumentFingerprint
-    if (call.callPresent === false || call.name === undefined || retryKey === undefined) continue
+    if (call.callPresent === false || call.name === undefined || call.name === 'unknown tool' || retryKey === undefined) continue
     const key = `${call.name}\u0000${retryKey}`
     const values = runs.get(key) ?? []
     values.push(call)
@@ -121,9 +121,9 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
       if (first === undefined) continue
       findings.push({
         code: 'retry_loop', severity: 'error', step: first.step,
-        title: `Repeated failing call to ${first.name ?? 'metadata unavailable'}`,
+        title: `Repeated failing call to ${first.name ?? 'unknown tool'}`,
         eventSeqs: calls.flatMap(call => eventSeqs(call.callEventSeq, call.resultEventSeq)),
-        evidence: [`same_call_count=${calls.length}`, `tool=${first.name ?? 'unavailable'}`],
+        evidence: [`same_call_count=${calls.length}`, `tool=${first.name ?? 'unknown tool'}`],
         recommendation: 'Stop repeating the unchanged call; inspect its preconditions or choose another recovery path.',
       })
     }

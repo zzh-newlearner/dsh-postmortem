@@ -48,10 +48,34 @@ describe('real DSH composition', () => {
     expect(repair?.result.text).toContain('fresh agent attempt')
     expect(range?.result.text).toContain('2 selected turns')
     expect(lastFailed?.result.text).toContain('turn 2')
-    expect(feedback?.result.text).toContain('@huichangzz/dsh-postmortem 0.9.1')
+    expect(feedback?.result.text).toContain('@huichangzz/dsh-postmortem 0.9.2')
     expect(feedback?.result.text).toContain('issues/new/choose')
     expect(feedback?.result.text).not.toContain('private output')
     expect(session.events.map(event => event.type)).not.toContain('agent/inject')
+
+    const headlessSession = ctx.sessions.create(SessionId('postmortem-empty-headless-ids'))
+    const emptyCallId = CallId('')
+    headlessSession.append('turn/start', { turn: 1 })
+    for (const step of [1, 2, 3]) {
+      headlessSession.append('tool/call', {
+        turn: 1, step, callId: emptyCallId, name: '',
+        arguments: JSON.stringify({ command: 'cat /nonexistent/seed.txt', description: `Retry description ${step}` }),
+      })
+      headlessSession.append('tool/result', {
+        turn: 1, step,
+        message: createToolResultMessage({ callId: emptyCallId, content: [{ type: 'text', text: 'private output' }], isError: true }),
+        error: { name: 'ToolError', code: 'ENOENT' },
+      }, { surfaceOp: 'append' })
+    }
+    headlessSession.append('turn/end', { turn: 1, reason: { kind: 'error', error: { code: 'UNKNOWN', message: 'private terminal message' } } })
+    const headlessAgent = { id: headlessSession.id, session: headlessSession, ctx } as never
+    const headlessReport = await ctx.commands.execute(headlessAgent, '/postmortem 1', [], new AbortController().signal)
+    const headlessExport = await ctx.commands.execute(headlessAgent, '/postmortem-export 1', [], new AbortController().signal)
+    expect(headlessReport?.result.text).toContain('Tool cat failed')
+    expect(headlessReport?.result.text).toContain('Repeated failing call to cat')
+    expect(headlessExport?.result.text).toContain('"retry_loop"')
+    expect(headlessExport?.result.text).not.toContain('seed.txt')
+    expect(headlessExport?.result.text).not.toContain('Retry description')
   })
 
   it('reports an open scheduled model retry without calling a review model', async () => {

@@ -30,7 +30,7 @@ export type * from './types.js'
 
 export const name = 'dsh-postmortem'
 export const inject = ['commands', 'sessions', 'llm']
-const PACKAGE_VERSION = '0.9.1'
+const PACKAGE_VERSION = '0.9.2'
 
 export interface Config {
   /** false disables logs; detected is the quiet default; all retains legacy behavior. */

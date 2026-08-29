@@ -97,9 +97,9 @@ The compatibility target is DSH `0.1.1-rc.2` and Cordis `4.0.1`. DSH is in devel
 
 兼容性目标为 DSH `0.1.1-rc.2` 与 Cordis `4.0.1`。DSH 仍处于 developer preview；本插件以公开 session event 词汇表作为兼容性边界。
 
-Headless collectors may degrade `tool/call` fields. Non-empty `callId` values are the only merge keys: empty IDs stay as separate observations, canonical `assistant/message` tool-call blocks may restore a matching call's name and argument fingerprint, and result-only IDs remain diagnosable. Retry grouping excludes presentation-only fields such as `description` only when executable input remains; missing metadata never becomes a guessed retry loop.
+Headless collectors may degrade `tool/call` fields. Non-empty `callId` values are the only cross-event merge keys; when IDs are empty, calls remain distinct and the matching empty-ID results pair FIFO by the same DSH step. Canonical `assistant/message` tool-call blocks may restore metadata; otherwise a safe first command token (for example `cat`) is used only when it passes a restrictive allowlist, and the literal `unknown tool` is shown otherwise. Retry grouping excludes presentation-only fields such as `description` only when executable input remains; unknown tools never become a guessed retry loop.
 
-headless collector 可能降级 `tool/call` 字段。只有非空 `callId` 能作为合并键：空 ID 始终保留为独立观测；规范 `assistant/message` 中的 tool-call block 可补回同一调用的工具名和参数指纹；仅有结果的 ID 仍可诊断。重试分组只会在仍有可执行输入时忽略 `description` 等展示性字段；元数据缺失绝不会被猜成重试环。
+headless collector 可能降级 `tool/call` 字段。只有非空 `callId` 能跨事件合并；ID 为空时，每个调用仍独立保留，且同一 DSH step 的空 ID result 会按 FIFO 配对。规范 `assistant/message` 中的 tool-call block 可补回元数据；否则只会在命令首 token 通过严格白名单时显示它（例如 `cat`），其余显示为 `unknown tool`。重试分组只会在仍有可执行输入时忽略 `description` 等展示性字段；未知工具绝不会被猜成重试环。
 
 ## Privacy And Reliability / 隐私与可靠性
 

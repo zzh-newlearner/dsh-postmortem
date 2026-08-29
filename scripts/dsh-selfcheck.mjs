@@ -50,5 +50,30 @@ if (combined.includes('private-command') || combined.includes('private tool outp
 }
 if (session.events.some(event => event.type === 'agent/inject')) throw new Error('self-check unexpectedly injected agent context')
 
+const headlessSession = ctx.sessions.create(SessionId('postmortem-empty-headless-ids'))
+const emptyCallId = CallId('')
+headlessSession.append('turn/start', { turn: 1 })
+for (const step of [1, 2, 3]) {
+  headlessSession.append('tool/call', {
+    turn: 1, step, callId: emptyCallId, name: '',
+    arguments: JSON.stringify({ command: 'cat /nonexistent/seed.txt', description: `Retry description ${step}` }),
+  })
+  headlessSession.append('tool/result', {
+    turn: 1, step,
+    message: createToolResultMessage({ callId: emptyCallId, content: [{ type: 'text', text: 'private output' }], isError: true }),
+    error: { name: 'ToolError', code: 'ENOENT' },
+  }, { surfaceOp: 'append' })
+}
+headlessSession.append('turn/end', { turn: 1, reason: { kind: 'error', error: { code: 'UNKNOWN', message: 'private terminal message' } } })
+const headlessAgent = { id: headlessSession.id, session: headlessSession, ctx }
+const headlessReport = requiredText(await ctx.commands.execute(headlessAgent, '/postmortem 1', [], signal), 'empty-id postmortem')
+const headlessExport = requiredText(await ctx.commands.execute(headlessAgent, '/postmortem-export 1', [], signal), 'empty-id postmortem-export')
+if (!headlessReport.includes('Tool cat failed') || !headlessReport.includes('Repeated failing call to cat')) {
+  throw new Error('empty headless call IDs did not produce a paired retry-loop diagnosis')
+}
+if (headlessExport.includes('seed.txt') || headlessExport.includes('Retry description')) {
+  throw new Error('empty-id diagnosis leaked a raw command or description')
+}
+
 console.log(report)
-console.log('\nDSH command-path self-check passed: report, export, plan, repair, feedback, redaction, and no injection.')
+console.log('\nDSH command-path self-check passed: report, export, plan, repair, feedback, empty-ID headless pairing, redaction, and no injection.')
