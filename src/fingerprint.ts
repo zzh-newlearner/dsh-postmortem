@@ -28,3 +28,40 @@ export function argumentFingerprint(argumentsValue: unknown): string | undefined
   }
   return stableFingerprint(normalized)
 }
+
+const PRESENTATION_KEYS = new Set([
+  'commentary', 'description', 'explanation', 'rationale', 'reasoning', 'summary', 'thought',
+])
+
+function parsedArguments(argumentsValue: unknown): unknown {
+  if (typeof argumentsValue !== 'string') return argumentsValue
+  try {
+    return JSON.parse(argumentsValue)
+  } catch {
+    return argumentsValue
+  }
+}
+
+function removePresentationFields(value: unknown): unknown | undefined {
+  if (Array.isArray(value)) {
+    const values = value.map(removePresentationFields).filter((item): item is unknown => item !== undefined)
+    return values.length === 0 ? undefined : values
+  }
+  if (value === null || typeof value !== 'object') return value
+  const retained = Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !PRESENTATION_KEYS.has(key.toLowerCase()))
+    .map(([key, item]) => [key, removePresentationFields(item)] as const)
+    .filter((entry): entry is readonly [string, unknown] => entry[1] !== undefined)
+  return retained.length === 0 ? undefined : Object.fromEntries(retained)
+}
+
+/**
+ * Fingerprint the executable part of a call for retry detection. Presentation
+ * text is intentionally excluded: headless providers often regenerate it on
+ * each retry. A call containing only presentation text has no retry key.
+ */
+export function retryFingerprint(argumentsValue: unknown): string | undefined {
+  if (argumentsValue === undefined) return undefined
+  const executable = removePresentationFields(parsedArguments(argumentsValue))
+  return executable === undefined ? undefined : stableFingerprint(executable)
+}

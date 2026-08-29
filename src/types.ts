@@ -1,11 +1,17 @@
 export type Severity = 'error' | 'warning'
 
 export interface ToolCall {
-  callId: string
-  name: string
+  /** Provider-issued id when the event contained a non-empty correlation id. */
+  callId?: string
+  /** Missing names stay absent rather than being collapsed into an empty-tool bucket. */
+  name?: string
   /** One-way key used only while diagnosing unchanged retries. */
   argumentFingerprint?: string
+  /** One-way key with presentation-only fields removed for headless retries. */
+  retryFingerprint?: string
   step: number
+  /** Whether a tool/call event, rather than only a tool/result, was observed. */
+  callPresent?: boolean
   callEventSeq?: number
   resultEventSeq?: number
   resultPresent: boolean

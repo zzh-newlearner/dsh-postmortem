@@ -3,7 +3,7 @@ import type { Finding, ModelState, PostmortemReport, ToolCall, TurnTrace } from 
 const RETRY_THRESHOLD = 3
 
 function toolSummary(call: ToolCall): string {
-  return `tool=${call.name}, call=${call.callId}`
+  return `tool=${call.name ?? 'unavailable'}, call=${call.callId ?? 'unavailable'}`
 }
 
 function eventSeqs(...values: Array<number | undefined>): number[] {
@@ -91,15 +91,15 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
     if (call.isError && !(cancelled && cancellationError(call.errorCode))) {
       findings.push({
         code: 'tool_error', severity: 'error', step: call.step,
-        title: `Tool ${call.name} failed`, eventSeqs: eventSeqs(call.callEventSeq, call.resultEventSeq),
+        title: `Tool ${call.name ?? 'metadata unavailable'} failed`, eventSeqs: eventSeqs(call.callEventSeq, call.resultEventSeq),
         evidence: [toolSummary(call), ...(call.errorCode ? [`error_code=${call.errorCode}`] : [])],
         recommendation: toolRecommendation(call.errorCode),
       })
     }
-    if (trace.ended && !call.resultPresent && !cancelled) {
+    if (trace.ended && call.callPresent !== false && !call.resultPresent && !cancelled) {
       findings.push({
         code: 'missing_result', severity: 'warning', step: call.step,
-        title: `Tool ${call.name} has no recorded result`, eventSeqs: eventSeqs(call.callEventSeq),
+        title: `Tool ${call.name ?? 'metadata unavailable'} has no recorded result`, eventSeqs: eventSeqs(call.callEventSeq),
         evidence: [toolSummary(call)],
         recommendation: 'Verify whether the tool timed out, was cancelled, or failed before it could return.',
       })
@@ -108,8 +108,9 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
 
   const runs = new Map<string, ToolCall[]>()
   for (const call of trace.toolCalls) {
-    if (call.argumentFingerprint === undefined) continue
-    const key = `${call.name}\u0000${call.argumentFingerprint}`
+    const retryKey = call.retryFingerprint ?? call.argumentFingerprint
+    if (call.callPresent === false || call.name === undefined || retryKey === undefined) continue
+    const key = `${call.name}\u0000${retryKey}`
     const values = runs.get(key) ?? []
     values.push(call)
     runs.set(key, values)
@@ -120,9 +121,9 @@ export function diagnose(trace: TurnTrace, modelState: ModelState = 'disabled'):
       if (first === undefined) continue
       findings.push({
         code: 'retry_loop', severity: 'error', step: first.step,
-        title: `Repeated failing call to ${first.name}`,
+        title: `Repeated failing call to ${first.name ?? 'metadata unavailable'}`,
         eventSeqs: calls.flatMap(call => eventSeqs(call.callEventSeq, call.resultEventSeq)),
-        evidence: [`same_call_count=${calls.length}`, `tool=${first.name}`],
+        evidence: [`same_call_count=${calls.length}`, `tool=${first.name ?? 'unavailable'}`],
         recommendation: 'Stop repeating the unchanged call; inspect its preconditions or choose another recovery path.',
       })
     }

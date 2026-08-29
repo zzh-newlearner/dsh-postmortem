@@ -48,7 +48,7 @@ describe('real DSH composition', () => {
     expect(repair?.result.text).toContain('fresh agent attempt')
     expect(range?.result.text).toContain('2 selected turns')
     expect(lastFailed?.result.text).toContain('turn 2')
-    expect(feedback?.result.text).toContain('@huichangzz/dsh-postmortem 0.9.0')
+    expect(feedback?.result.text).toContain('@huichangzz/dsh-postmortem 0.9.1')
     expect(feedback?.result.text).toContain('issues/new/choose')
     expect(feedback?.result.text).not.toContain('private output')
     expect(session.events.map(event => event.type)).not.toContain('agent/inject')

@@ -97,6 +97,10 @@ The compatibility target is DSH `0.1.1-rc.2` and Cordis `4.0.1`. DSH is in devel
 
 兼容性目标为 DSH `0.1.1-rc.2` 与 Cordis `4.0.1`。DSH 仍处于 developer preview；本插件以公开 session event 词汇表作为兼容性边界。
 
+Headless collectors may degrade `tool/call` fields. Non-empty `callId` values are the only merge keys: empty IDs stay as separate observations, canonical `assistant/message` tool-call blocks may restore a matching call's name and argument fingerprint, and result-only IDs remain diagnosable. Retry grouping excludes presentation-only fields such as `description` only when executable input remains; missing metadata never becomes a guessed retry loop.
+
+headless collector 可能降级 `tool/call` 字段。只有非空 `callId` 能作为合并键：空 ID 始终保留为独立观测；规范 `assistant/message` 中的 tool-call block 可补回同一调用的工具名和参数指纹；仅有结果的 ID 仍可诊断。重试分组只会在仍有可执行输入时忽略 `description` 等展示性字段；元数据缺失绝不会被猜成重试环。
+
 ## Privacy And Reliability / 隐私与可靠性
 
 The local rules identify failed tools, absent results after a closed turn, unchanged retries, terminal causes, and user cancellation. Reports retain only turn number, step, tool name, opaque call ID, error code, and event sequence number. Raw messages, arguments, outputs, files, prompts, credentials, and session traces are never retained or exported.
@@ -159,6 +163,10 @@ npm pack --dry-run
 `npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the five user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
 
 `npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证五个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
+
+The regression suite also replays degraded headless event shapes: empty calls must not collapse, canonical assistant blocks restore matching metadata, result-only IDs remain visible, and regenerated descriptions do not split a stable executable retry. Release validation should additionally run DSH's official keyless headless end-to-end fixture, which drives the real Loader, persisted SessionEvent stream, and local bash tool with a mock model.
+
+回归套件还会重放降级的 headless 事件：空调用不能塌缩，规范 assistant block 必须补回匹配元数据，只有结果的 ID 仍可见，重新生成的描述不能拆散同一可执行重试。发布验收还应运行 DSH 官方无凭据 headless 端到端 fixture，它会以 mock 模型驱动真实 Loader、持久化 SessionEvent 流和本地 bash 工具。
 
 ## License / 许可证
 

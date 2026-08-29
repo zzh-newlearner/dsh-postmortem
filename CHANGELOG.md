@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.1
+
+- Preserves each degraded headless `tool/call` with an empty ID as an independent observation instead of merging an entire turn into one call.
+- Recovers tool metadata from canonical DSH `assistant/message` tool-call blocks, keeps result-only call IDs diagnosable, and supports legacy direct result IDs.
+- Makes retry grouping resilient to regenerated presentation descriptions while requiring both a reliable tool name and remaining executable input; incomplete telemetry no longer creates guessed retry loops.
+- Adds regression coverage for those event shapes and documents DSH's official keyless headless Loader, persisted SessionEvent, and local bash round trip as an external release check.
+
 ## 0.9.0
 
 - Fixes retry-loop false positives for structured or absent tool arguments; only calls with a matching one-way argument fingerprint are grouped.
