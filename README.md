@@ -20,9 +20,13 @@ Postmortem: 2 finding(s) in turn 1.
 - [error] step 1: Turn ended with error. Use the earlier tool findings as the first recovery target; do not treat the terminal state as a root cause.
 ```
 
-Then use `/postmortem-repair` to get a copy-only recovery prompt. It tells the next agent attempt to verify the missing resource first and forbids repeating the same failed call unchanged.
+Then use `/postmortem-next` for one concise route: the primary issue, the first verification, and the right fresh-attempt command for the current DSH runtime. It does not treat an agent's completion text as task success.
 
-随后执行 `/postmortem-repair` 获取仅供复制的恢复提示。它会要求下一次 agent 尝试先验证缺失资源，并禁止原样重复失败调用。
+随后执行 `/postmortem-next` 获取一条简洁路线：主问题、第一项验证，以及适合当前 DSH runtime 的新尝试命令。它不会把 agent 的完成文本当作任务成功。
+
+When DSH has an agent runtime, `/postmortem-recover` turns the redacted handoff into one fresh, lineage-linked DSH session. It never seeds the failed transcript into the new agent. `/postmortem-recovery` shows local execution state for that attempt. A completed agent turn is deliberately reported as execution completion, not task success: the task's existing CI, command, or verifier remains the source of truth.
+
+当 DSH 提供 agent runtime 时，`/postmortem-recover` 会将脱敏交接创建为一个新的、带血缘关系的 DSH session；失败 transcript 不会作为 seed 传入新 agent。`/postmortem-recovery` 用于查看该尝试的本地执行状态。agent turn 完成只表示执行完成，并不等同于任务成功；项目现有的 CI、命令或验证器仍是任务成功的唯一依据。
 
 Use `/postmortem-plan` when a runner needs the same advice as strict, redacted JSON: every action includes its evidence category, an advisory action, and a verification step. Plans are copy-only and are never executed by this package.
 
@@ -74,14 +78,18 @@ To enable the optional model review, add this override to that profile's `cordis
 | Command / 命令 | Use / 用途 |
 | --- | --- |
 | `/postmortem [turn\|from-to\|--last-failed]` | Read the latest, selected, range, or most recent failed turn. The first line distinguishes an open live status from an ended turn. / 查看最新、指定、范围或最近失败轮次；首行会区分开放轮次的实时状态与已结束轮次。 |
+| `/postmortem-next [turn\|--last-failed]` | Show the primary issue, first verification, and one safe next command. / 显示主问题、首个验证步骤，以及一条安全的下一步命令。 |
 | `/postmortem-plan [turn\|from-to\|--last-failed]` | Export schema-v1 copy-only repair actions with verification steps. / 导出带验证步骤的 schema-v1 仅复制修复动作。 |
 | `/postmortem-repair [turn\|from-to\|--last-failed]` | Copy a bounded recovery prompt for a fresh agent attempt, never a session that is still running. / 复制用于新 agent 尝试的受限恢复提示，不能粘贴进仍在运行的 session。 |
+| `/postmortem-handoff [turn\|--last-failed]` | Export one redacted schema-v1 handoff packet for a fresh DSH recovery session. / 为新的 DSH 恢复 session 导出一份脱敏 schema-v1 交接包。 |
+| `/postmortem-recover [turn\|--last-failed]` | Explicitly create one fresh, parent-linked DSH agent from a redacted handoff. / 显式基于脱敏交接创建一个新的、带父 session 关系的 DSH agent。 |
+| `/postmortem-recovery` | Show the execution state of the current recovery session; it never claims task success. / 查看当前恢复 session 的执行状态；不会声称任务已成功。 |
 | `/postmortem-export [turn\|from-to\|--last-failed]` | Export a redacted schema-v2 report, or a range envelope, for issue filing or evaluation. / 导出脱敏 schema-v2 报告或范围封装，用于提交 issue 或评测。 |
 | `/postmortem-feedback [turn\|from-to\|--last-failed]` | Render a redacted issue template with plugin version and report. It does not upload or copy data. / 生成含插件版本与报告的脱敏 issue 模板；不会上传或复制数据。 |
 
-Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. Text reports show at most four findings and explicitly link to full export when truncated; structured plans retain all findings. The repair and feedback commands only return text or JSON. They never retry a tool, change the agent loop, inject a follow-up, copy data, or become model context.
+Commands use `recordInput: false`: selecting a historical turn does not enter the session event log. Text reports show at most four findings and explicitly link to full export when truncated; structured plans retain all findings. `/postmortem-next`, repair, handoff, and feedback only return text or JSON. `/postmortem-recover` is explicit: it creates one fresh, parent-linked agent from a redacted handoff and never retries or injects into the failed session.
 
-命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。文本报告最多显示四条 finding，截断时会明确提示完整导出；结构化计划保留全部 finding。修复与反馈命令只返回文本或 JSON，不会重试工具、改变 agent loop、注入 follow-up、复制数据或进入模型上下文。
+命令使用 `recordInput: false`：选择历史轮次不会进入 session event log。文本报告最多显示四条 finding，截断时会明确提示完整导出；结构化计划保留全部 finding。`/postmortem-next`、修复、交接与反馈只返回文本或 JSON。`/postmortem-recover` 需要显式调用：它从脱敏交接创建一个带父 session 关系的新 agent，绝不会重试或向失败 session 注入内容。
 
 When DSH has scheduled a provider retry, `/postmortem` returns immediate local status instead of waiting for a terminal turn. It retains only retry count, step, delay, mode, finite retry budget, and error code; provider details and failure messages are discarded. This live status never invokes the optional review model or emits a repair prompt.
 
@@ -89,9 +97,9 @@ When DSH has scheduled a provider retry, `/postmortem` returns immediate local s
 
 ## Built For, Not Around / 适合什么，不做什么
 
-This is a failure-explanation and recovery-planning plugin for DSH users who need a safe next action after an agent run fails. It is deliberately **not** an autonomous retry system, a trace-upload service, or a replacement for task-level observability.
+This is a failure-explanation and recovery-planning plugin for DSH users who need a safe next action after an agent run fails. It can create one explicit fresh recovery attempt, but task-level success remains owned by the project's verifier.
 
-它面向需要在 agent 运行失败后获得安全下一步动作的 DSH 用户，是故障解释与恢复规划插件。它刻意**不是**自动重试系统、轨迹上传服务，也不替代任务级可观测性。
+它面向需要在 agent 运行失败后获得安全下一步动作的 DSH 用户，是故障解释与恢复规划插件。它可以创建一次显式的新恢复尝试，但任务级成功仍由项目自己的验证器判定。
 
 The compatibility target is DSH `0.1.1-rc.2` and Cordis `4.0.1`. DSH is in developer preview; the public session-event vocabulary is this plugin's compatibility boundary.
 
@@ -133,7 +141,11 @@ Seed 标签用于防止确定性 parser 与规则回归，不能作为 precision
 
 For a task-success claim, use `evaluateVerifiedPairs()` and the [verified-pair schema](schemas/verified-paired-run-v1.schema.json). It rejects a pair unless both arms share a protocol ID, task fingerprint, environment fingerprint, and success-criterion fingerprint; baseline must have no intervention, while the postmortem arm must identify a repair-plan fingerprint. Run `npm run eval:verified` to inspect the synthetic negative controls. This checks experiment integrity, not whether a task runner itself is correct.
 
+No human annotation is required for this task-success measure when the criterion is executable: for example, a test command exit status, a checker result, or a deterministic artifact assertion. Record the verifier and its fingerprint before running both arms, keep the workspace and task inputs matched, and treat an agent's completion text as unverified unless that external criterion passes.
+
 若要声明任务成功率提升，请使用 `evaluateVerifiedPairs()` 和 [严格配对 schema](schemas/verified-paired-run-v1.schema.json)。除非两臂共享 protocol ID、任务指纹、环境指纹和成功判据指纹，否则评测器会排除该配对；baseline 不得有干预，postmortem 臂必须标识修复计划指纹。运行 `npm run eval:verified` 可查看合成负对照。它检查实验完整性，而不验证任务 runner 本身是否正确。
+
+当成功判据可执行时，该任务成功率指标不需要人工标注，例如测试命令退出状态、checker 结果或确定性的产物断言。应在运行两臂前记录验证器及其指纹，保持工作区与任务输入匹配；除非外部判据通过，否则 agent 的完成文本始终视为未验证。
 
 For an OpenAI-compatible model protocol smoke test, use the redacted-only runner below. It preflights models, round-robins work fairly, and opens a rate-limit circuit after the first 429.
 
@@ -155,6 +167,8 @@ npm test
 npm run build
 npm run demo
 npm run selfcheck:dsh
+npm run selfcheck:recovery
+npm run selfcheck:recovery-agent
 npm run eval:paired
 npm run eval:verified
 npm pack --dry-run
@@ -163,6 +177,14 @@ npm pack --dry-run
 `npm run selfcheck:dsh` exercises the built package through DSH's real session, command, and LLM services. It verifies the five user commands, redaction of tool inputs and outputs, and the no-injection boundary without calling a model or a tool.
 
 `npm run selfcheck:dsh` 通过 DSH 真实的 session、command 与 LLM 服务执行构建产物，验证五个用户命令、工具输入输出脱敏与不注入边界，不调用模型或工具。
+
+`npm run selfcheck:recovery` exercises the built package's recovery command path through real DSH session and command services. It verifies the redacted handoff, the explicit-only creation boundary, and the safe no-agent-runtime error without a model or a tool.
+
+`npm run selfcheck:recovery` 通过真实 DSH 的 session 与 command 服务执行构建产物的恢复命令路径，验证脱敏交接、仅显式创建边界，以及无 agent runtime 时的安全错误；不调用模型或工具。
+
+`npm run selfcheck:recovery-agent` runs the concrete DSH `AgentLoop` with a keyless test adapter. It verifies guided recovery, fresh session lineage, redacted handoff, and completed recovery status.
+
+`npm run selfcheck:recovery-agent` 使用无密钥测试适配器运行具体 DSH `AgentLoop`，验证恢复引导、新 session 血缘、脱敏交接与完成后的恢复状态。
 
 The regression suite also replays degraded headless event shapes: empty calls must not collapse, canonical assistant blocks restore matching metadata, result-only IDs remain visible, and regenerated descriptions do not split a stable executable retry. Release validation should additionally run DSH's official keyless headless end-to-end fixture, which drives the real Loader, persisted SessionEvent stream, and local bash tool with a mock model.
 

@@ -32,15 +32,19 @@ const signal = new AbortController().signal
 const report = requiredText(await ctx.commands.execute(agent, '/postmortem', [], signal), 'postmortem')
 const exported = requiredText(await ctx.commands.execute(agent, '/postmortem-export 1', [], signal), 'postmortem-export')
 const plan = requiredText(await ctx.commands.execute(agent, '/postmortem-plan 1', [], signal), 'postmortem-plan')
+const next = requiredText(await ctx.commands.execute(agent, '/postmortem-next 1', [], signal), 'postmortem-next')
 const repair = requiredText(await ctx.commands.execute(agent, '/postmortem-repair 1', [], signal), 'postmortem-repair')
 const feedback = requiredText(await ctx.commands.execute(agent, '/postmortem-feedback 1', [], signal), 'postmortem-feedback')
-const combined = `${report}\n${exported}\n${plan}\n${repair}\n${feedback}`
+const combined = `${report}\n${exported}\n${plan}\n${next}\n${repair}\n${feedback}`
 
 if (!report.includes('Tool shell failed') || !repair.includes('Do not repeat an unchanged failing tool call')) {
   throw new Error('expected diagnostic or recovery guidance is missing')
 }
 if (!plan.includes('"execution": "copy_only"') || !plan.includes('"verification"')) {
   throw new Error('repair plan did not preserve its copy-only and verification boundaries')
+}
+if (!next.includes('Primary issue: Tool shell failed') || !next.includes('/postmortem-handoff 1')) {
+  throw new Error('operator next-step guidance is missing or selected an unavailable recovery runtime')
 }
 if (!feedback.includes('issues/new/choose') || !repair.includes('fresh agent attempt')) {
   throw new Error('feedback or fresh-attempt guidance is missing')
@@ -76,4 +80,4 @@ if (headlessExport.includes('seed.txt') || headlessExport.includes('Retry descri
 }
 
 console.log(report)
-console.log('\nDSH command-path self-check passed: report, export, plan, repair, feedback, empty-ID headless pairing, redaction, and no injection.')
+console.log('\nDSH command-path self-check passed: report, next-step guidance, export, plan, repair, feedback, empty-ID headless pairing, redaction, and no injection.')

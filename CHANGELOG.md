@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Adds `/postmortem-next`, a concise operator-facing route that identifies the primary issue, first verification, and either a fresh DSH recovery command or a redacted handoff export.
+- Adds explicit fresh-session recovery through `/postmortem-handoff`, `/postmortem-recover`, and `/postmortem-recovery`; recovery keeps parent-session lineage and sends only the redacted handoff.
+- Adds keyless built-package DSH recovery self-checks, including a concrete `AgentLoop` path that verifies guided recovery, lineage, redaction, and terminal state.
+- Clarifies that task success requires an executable project verifier and does not follow from an agent completion message.
+
 ## 0.9.2
 
 - Pairs empty-ID headless `tool/result` events to distinct empty-ID `tool/call` observations by same-turn DSH step, including result-first ordering; empty IDs no longer block error evidence or retry-loop detection.

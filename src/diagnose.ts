@@ -173,6 +173,6 @@ export function formatReport(report: PostmortemReport): string {
   } else if (report.modelState === 'failed') {
     lines.push('Model review was unavailable; deterministic findings remain authoritative.')
   }
-  lines.push(`Next: /postmortem-repair ${report.turn} for a fresh-attempt prompt, /postmortem-plan ${report.turn} for JSON actions, or /postmortem-export ${report.turn} for the full report.`)
+  lines.push(`Next: /postmortem-next ${report.turn} for one recommended action, /postmortem-repair ${report.turn} for a fresh-attempt prompt, /postmortem-plan ${report.turn} for JSON actions, or /postmortem-export ${report.turn} for the full report.`)
   return lines.join('\n')
 }

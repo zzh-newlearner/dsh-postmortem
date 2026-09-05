@@ -1,28 +1,35 @@
 import type { Context } from '@deepseek-ai/cordis'
 import '@deepseek-ai/dsh-commands'
 import '@deepseek-ai/dsh-session'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { turnFromEvents } from './adapter.js'
 import { diagnose, formatReport } from './diagnose.js'
 import { explainWithModel, type ModelConfig } from './explain.js'
 import { buildRepairPlan, buildRepairPrompt } from './repair.js'
+import { formatNextStep } from './guidance.js'
 import { PostmortemStore } from './store.js'
+import { buildRecoveryHandoff, RecoveryStore } from './recovery.js'
 import type { PostmortemReport, RecordedEvent } from './types.js'
 
 export { turnFromEvents } from './adapter.js'
 export { diagnose, formatReport } from './diagnose.js'
 export { explainWithModel, parseModelReview, reviewPrompt, type ModelConfig } from './explain.js'
 export { buildRepairPlan, buildRepairPrompt, repairPlanFingerprint } from './repair.js'
+export { formatNextStep } from './guidance.js'
 export { summarizeAnnotations, validateDiagnosisAdjudication, validateDiagnosisAnnotation } from './annotations.js'
 export { evaluationSplit, scoreDiagnosisCorpus, validateDiagnosisDatasetRecord } from './dataset.js'
 export { evaluatePairs } from './evaluation.js'
 export { evaluateVerifiedPairs, validateVerifiedPairedRunRecord } from './verified-evaluation.js'
 export { ModelEvaluationError, evaluateModelReviews, humanReferences, seedReferences, summarizeModelEvaluationRecords } from './model-eval.js'
 export { PostmortemStore } from './store.js'
+export { buildRecoveryHandoff, RecoveryStore } from './recovery.js'
 export type { PairedEvaluation, PairedRunRecord, PairIssue } from './evaluation.js'
 export type { VerifiedPairedEvaluation, VerifiedPairedRunRecord } from './verified-evaluation.js'
 export type { RepairAction, RepairActionKind, RepairPlan } from './types.js'
+export type { RecoveryAttempt, RecoveryExecutionState, RecoveryHandoff } from './recovery.js'
+export type { NextStepOptions } from './guidance.js'
 export type { DatasetExpectation, DatasetOrigin, DatasetOriginKind, DiagnosisCorpusScore, DiagnosisDatasetRecord, EvaluationSplit } from './dataset.js'
 export type { AnnotationIssue, AnnotationPrimaryIssue, AnnotationSummary, DiagnosisAdjudication, DiagnosisAnnotation, HumanReference } from './annotations.js'
 export type { ModelEvaluationCaller, ModelEvaluationCase, ModelEvaluationOptions, ModelEvaluationRecord, ModelEvaluationReference, ModelEvaluationRun, ModelEvaluationSummary } from './model-eval.js'
@@ -151,10 +158,83 @@ function feedbackTemplate(reports: readonly PostmortemReport[]): string {
   ].join('\n')
 }
 
+function recoverySelection(rawInput: string, session: Session): number | undefined {
+  const selection = turnSelection(rawInput, session)
+  return selection?.range === false ? selection.turns[0] : undefined
+}
+
 export function apply(ctx: Context, config: Config = {}): void {
   const store = new PostmortemStore()
+  const recoveryStore = new RecoveryStore()
   const logger = ctx.logger('dsh-postmortem')
   const llm = ctx.llm as LlmRuntime
+
+  ctx.effect(() => () => { void recoveryStore.dispose() })
+  ctx.on('session/event', (session, event) => {
+    recoveryStore.observe(session.id, event as unknown as { type: string, data: Record<string, unknown> })
+  })
+
+  ctx.commands.register({
+    name: 'postmortem-next',
+    description: 'Show one concise, safe next step for a failed turn.',
+    input: { hint: '[turn|--last-failed]' },
+    recordInput: false,
+    async handler({ agent, rawInput, signal }) {
+      const turn = recoverySelection(rawInput, agent.session)
+      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-next [turn|--last-failed]' }
+      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
+      return {
+        kind: 'success',
+        text: formatNextStep(report, { recoveryAvailable: agent.ctx.get('agents') !== undefined }),
+      }
+    },
+  })
+
+  ctx.commands.register({
+    name: 'postmortem-handoff',
+    description: 'Export a redacted handoff for one fresh recovery attempt.',
+    input: { hint: '[turn|--last-failed]' },
+    recordInput: false,
+    async handler({ agent, rawInput, signal }) {
+      const turn = recoverySelection(rawInput, agent.session)
+      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-handoff [turn|--last-failed]' }
+      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
+      const handoff = buildRecoveryHandoff(report)
+      if (handoff === undefined) return { kind: 'error', text: 'No actionable failed turn is available for a recovery handoff.' }
+      return { kind: 'success', text: JSON.stringify(handoff, null, 2) }
+    },
+  })
+
+  ctx.commands.register({
+    name: 'postmortem-recover',
+    description: 'Create a fresh DSH recovery agent from one redacted handoff.',
+    input: { hint: '[turn|--last-failed]' },
+    recordInput: false,
+    async handler({ agent, rawInput, signal }) {
+      const turn = recoverySelection(rawInput, agent.session)
+      if (turn === undefined) return { kind: 'error', text: 'Usage: /postmortem-recover [turn|--last-failed]' }
+      const report = await reportFor(agent.session, turn, store, config.model, llm, signal)
+      const handoff = buildRecoveryHandoff(report)
+      if (handoff === undefined) return { kind: 'error', text: 'No actionable failed turn is available for recovery.' }
+      try {
+        const attempt = await recoveryStore.start(agent as Agent, handoff, signal)
+        return { kind: 'success', text: JSON.stringify(attempt, null, 2) }
+      } catch (error: unknown) {
+        return { kind: 'error', text: error instanceof Error ? error.message : 'Unable to create a fresh DSH recovery agent.' }
+      }
+    },
+  })
+
+  ctx.commands.register({
+    name: 'postmortem-recovery',
+    description: 'Show the local execution state of this recovery attempt.',
+    recordInput: false,
+    async handler({ agent }) {
+      const attempt = recoveryStore.get(agent.session.id)
+      if (attempt === undefined) return { kind: 'error', text: 'This session is not a postmortem recovery attempt.' }
+      return { kind: 'success', text: JSON.stringify(attempt, null, 2) }
+    },
+  })
 
   ctx.commands.register({
     name: 'postmortem-plan',
