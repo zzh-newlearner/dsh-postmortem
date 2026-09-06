@@ -28,7 +28,7 @@ class RecoveryAdapter extends LlmAdapter {
 }
 
 function finalText(agent: Agent): string {
-  const message = agent.session.events.findLast(event => event.type === 'assistant/message')
+  const message = [...agent.session.events].reverse().find(event => event.type === 'assistant/message')
   return message?.type === 'assistant/message'
     ? message.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('')
     : ''
