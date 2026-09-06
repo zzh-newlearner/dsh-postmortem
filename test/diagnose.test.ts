@@ -73,7 +73,8 @@ describe('diagnose', () => {
     ] })
     const text = formatReport(report)
     expect(text).toContain('more finding(s) omitted')
-    expect(text).toContain('Next: /postmortem-repair 1')
+    expect(text).toContain('Next: /postmortem-next 1')
+    expect(text).toContain('/postmortem-repair 1')
   })
 
   it('does not recommend repair for an explicit user cancellation', () => {

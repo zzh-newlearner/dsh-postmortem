@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.3
 
 - Adds `/postmortem-next`, a concise operator-facing route that identifies the primary issue, first verification, and either a fresh DSH recovery command or a redacted handoff export.
 - Adds explicit fresh-session recovery through `/postmortem-handoff`, `/postmortem-recover`, and `/postmortem-recovery`; recovery keeps parent-session lineage and sends only the redacted handoff.
